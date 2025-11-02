@@ -837,6 +837,7 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
       :show_help -> {:noreply, assign(socket, :show_help_modal, true)}
       :show_status -> handle_command_status(socket)
       :clear_feed -> handle_command_clear_feed(socket)
+      :prune_feed -> handle_command_prune_feed(socket)
       _ -> {:noreply, put_flash(socket, :error, "Command not implemented yet")}
     end
   end
@@ -992,6 +993,23 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
      socket
      |> assign(:feed_events, [])
      |> put_flash(:info, "Live feed cleared")}
+  end
+
+  defp handle_command_prune_feed(socket) do
+    current_count = length(socket.assigns.feed_events)
+    pruned_events = Enum.take(socket.assigns.feed_events, @feed_limit)
+    pruned_count = current_count - length(pruned_events)
+
+    {:noreply,
+     socket
+     |> assign(:feed_events, pruned_events)
+     |> put_flash(
+       :info,
+       "Pruned #{pruned_count} event(s) from feed (kept #{length(pruned_events)}/#{@feed_limit})"
+     )
+     |> add_feed_event(
+       {:command_executed, "PRUNE_FEED: #{pruned_count} events removed", DateTime.utc_now()}
+     )}
   end
 
   defp add_feed_event(socket, event) do

@@ -193,6 +193,14 @@ defmodule TaskOverlordWeb.Dashboard.Commands do
         keyboard_shortcut: nil,
         usage_example: "cls",
         handler: :clear_feed
+      },
+      %Command{
+        name: "prune_feed",
+        aliases: ["prune", "trim_feed"],
+        description: "Prune feed events to the configured limit",
+        keyboard_shortcut: nil,
+        usage_example: "prune_feed",
+        handler: :prune_feed
       }
     ]
   end
@@ -232,7 +240,7 @@ defmodule TaskOverlordWeb.Dashboard.Commands do
       {"Task/Stream Management", Enum.slice(commands, 4..8)},
       {"Navigation", Enum.slice(commands, 9..11)},
       {"View Control", Enum.slice(commands, 12..15)},
-      {"System/Help", Enum.slice(commands, 16..18)}
+      {"System/Help", Enum.slice(commands, 16..19)}
     ]
   end
 end

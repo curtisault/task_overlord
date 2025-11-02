@@ -40,6 +40,7 @@ defmodule TaskOverlord.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
+      # Core
       {:phoenix, "~> 1.8.1"},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
@@ -62,7 +63,10 @@ defmodule TaskOverlord.MixProject do
       {:gettext, "~> 0.26"},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
-      {:bandit, "~> 1.5"}
+      {:bandit, "~> 1.5"},
+
+      # search
+      {:levenshtein, "~> 0.3.0"}
     ]
   end
 

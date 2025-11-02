@@ -14,7 +14,8 @@ defmodule TaskOverlordWeb.Dashboard.CardsLive do
      socket
      |> assign(:tasks, state.tasks |> Map.values())
      |> assign(:overlord_streams, state.streams |> Map.values())
-     |> assign_stats()}
+     |> assign_stats()
+     |> group_by_status()}
   end
 
   @impl true
@@ -23,7 +24,28 @@ defmodule TaskOverlordWeb.Dashboard.CardsLive do
      socket
      |> assign(:tasks, state.tasks |> Map.values())
      |> assign(:overlord_streams, state.streams |> Map.values())
-     |> assign_stats()}
+     |> assign_stats()
+     |> group_by_status()}
+  end
+
+  defp group_by_status(socket) do
+    tasks = socket.assigns.tasks
+    streams = socket.assigns.overlord_streams
+
+    # Group tasks by status (normalize :running to :in_progress)
+    running_tasks = Enum.filter(tasks, &(&1.status == :running))
+    done_tasks = Enum.filter(tasks, &(&1.status == :done))
+    error_tasks = Enum.filter(tasks, &(&1.status == :error))
+
+    # Group streams by status (normalize :streaming to :in_progress)
+    running_streams = Enum.filter(streams, &(&1.status == :streaming))
+    done_streams = Enum.filter(streams, &(&1.status == :done))
+    error_streams = Enum.filter(streams, &(&1.status == :error))
+
+    socket
+    |> assign(:in_progress, running_tasks ++ running_streams)
+    |> assign(:completed, done_tasks ++ done_streams)
+    |> assign(:failed, error_tasks ++ error_streams)
   end
 
   defp assign_stats(socket) do
@@ -113,6 +135,192 @@ defmodule TaskOverlordWeb.Dashboard.CardsLive do
   defp status_display(:done), do: "Done"
   defp status_display(:error), do: "Error"
 
+  defp is_task?(item), do: Map.has_key?(item, :pid)
+
+  defp task_card(assigns) do
+    ~H"""
+    <div class="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
+      <div class="card-body">
+        <div class="flex justify-between items-start">
+          <h3 class="card-title text-lg">{@task.heading}</h3>
+          <span class={"badge #{status_class(@task.status)}"}>
+            {status_display(@task.status)}
+          </span>
+        </div>
+
+        <p class="text-sm text-base-content/70">{@task.message}</p>
+
+        <div class="divider my-2"></div>
+
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between">
+            <span class="text-base-content/60">Started:</span>
+            <span class="font-mono">{format_relative_time(@task.started_at)}</span>
+          </div>
+
+          <%= if @task.finished_at do %>
+            <div class="flex justify-between">
+              <span class="text-base-content/60">Finished:</span>
+              <span class="font-mono">{format_relative_time(@task.finished_at)}</span>
+            </div>
+          <% end %>
+
+          <div class="flex justify-between">
+            <span class="text-base-content/60">Duration:</span>
+            <span class="font-mono font-bold">
+              {format_duration(@task.started_at, @task.finished_at)}
+            </span>
+          </div>
+
+          <%= if @task.status == :error && @task.result do %>
+            <div class="alert alert-error mt-2">
+              <div class="text-xs">
+                <div class="font-bold">Error:</div>
+                <div class="font-mono">{inspect(@task.result)}</div>
+              </div>
+            </div>
+          <% end %>
+
+          <%= if @task.status == :done && @task.result do %>
+            <div class="collapse collapse-arrow bg-base-200">
+              <input type="checkbox" />
+              <div class="collapse-title text-sm font-medium">
+                View Result
+              </div>
+              <div class="collapse-content">
+                <pre class="text-xs overflow-auto"><%= inspect(@task.result, pretty: true) %></pre>
+              </div>
+            </div>
+          <% end %>
+        </div>
+
+        <%= if length(@task.logs) > 0 do %>
+          <div class="divider my-2"></div>
+          <div class="collapse collapse-arrow bg-base-200">
+            <input type="checkbox" />
+            <div class="collapse-title text-sm font-medium">
+              Logs ({length(@task.logs)})
+            </div>
+            <div class="collapse-content">
+              <div class="space-y-1">
+                <%= for {level, log} <- @task.logs do %>
+                  <div class="text-xs">
+                    <span class="badge badge-xs">{level}</span>
+                    <span class="ml-2">{log}</span>
+                  </div>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        <% end %>
+
+        <div class="card-actions justify-end mt-2">
+          <button
+            phx-click="discard_task"
+            phx-value-ref={@task.base_encoded_ref}
+            class="btn btn-sm btn-ghost"
+          >
+            Discard
+          </button>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  defp stream_card(assigns) do
+    ~H"""
+    <div class="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
+      <div class="card-body">
+        <div class="flex justify-between items-start">
+          <h3 class="card-title text-lg">{@stream.heading}</h3>
+          <span class={"badge #{status_class(@stream.status)}"}>
+            {status_display(@stream.status)}
+          </span>
+        </div>
+
+        <p class="text-sm text-base-content/70">{@stream.message}</p>
+
+        <div class="divider my-2"></div>
+
+        <!-- Progress Bar -->
+        <div class="space-y-2">
+          <div class="flex justify-between text-sm">
+            <span>Progress</span>
+            <span class="font-mono">
+              {@stream.stream_completed}/{@stream.stream_total}
+            </span>
+          </div>
+          <progress
+            class="progress progress-primary w-full"
+            value={@stream.stream_completed}
+            max={@stream.stream_total}
+          >
+          </progress>
+          <%= if @stream.stream_total > 0 do %>
+            <div class="text-xs text-center">
+              {Float.round(@stream.stream_completed / @stream.stream_total * 100, 1)}%
+            </div>
+          <% end %>
+        </div>
+
+        <div class="divider my-2"></div>
+
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between">
+            <span class="text-base-content/60">Started:</span>
+            <span class="font-mono">{format_relative_time(@stream.started_at)}</span>
+          </div>
+
+          <%= if @stream.finished_at do %>
+            <div class="flex justify-between">
+              <span class="text-base-content/60">Finished:</span>
+              <span class="font-mono">{format_relative_time(@stream.finished_at)}</span>
+            </div>
+          <% end %>
+
+          <div class="flex justify-between">
+            <span class="text-base-content/60">Duration:</span>
+            <span class="font-mono font-bold">
+              {format_duration(@stream.started_at, @stream.finished_at)}
+            </span>
+          </div>
+        </div>
+
+        <%= if length(@stream.logs) > 0 do %>
+          <div class="divider my-2"></div>
+          <div class="collapse collapse-arrow bg-base-200">
+            <input type="checkbox" />
+            <div class="collapse-title text-sm font-medium">
+              Logs ({length(@stream.logs)})
+            </div>
+            <div class="collapse-content">
+              <div class="space-y-1">
+                <%= for {level, log} <- @stream.logs do %>
+                  <div class="text-xs">
+                    <span class="badge badge-xs">{level}</span>
+                    <span class="ml-2">{log}</span>
+                  </div>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        <% end %>
+
+        <div class="card-actions justify-end mt-2">
+          <button
+            phx-click="discard_stream"
+            phx-value-ref={@stream.base_encoded_ref}
+            class="btn btn-sm btn-ghost"
+          >
+            Discard
+          </button>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -126,8 +334,8 @@ defmodule TaskOverlordWeb.Dashboard.CardsLive do
             <.link navigate="/dashboard/terminal" class="btn btn-ghost">Terminal</.link>
           </div>
         </div>
-        
-    <!-- Stats Overview -->
+
+        <!-- Stats Overview -->
         <div class="stats shadow w-full">
           <div class="stat">
             <div class="stat-title">Total Tasks</div>
@@ -155,204 +363,73 @@ defmodule TaskOverlordWeb.Dashboard.CardsLive do
             <div class="stat-desc">Task completion</div>
           </div>
         </div>
-        
-    <!-- Tasks Section -->
-        <%= if length(@tasks) > 0 do %>
-          <div>
-            <h2 class="text-2xl font-bold mb-4">Tasks</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <%= for task <- @tasks do %>
-                <div class="card bg-base-100 shadow-xl">
-                  <div class="card-body">
-                    <div class="flex justify-between items-start">
-                      <h3 class="card-title text-lg">{task.heading}</h3>
-                      <span class={"badge #{status_class(task.status)}"}>
-                        {status_display(task.status)}
-                      </span>
-                    </div>
 
-                    <p class="text-sm text-base-content/70">{task.message}</p>
-
-                    <div class="divider my-2"></div>
-
-                    <div class="space-y-2 text-sm">
-                      <div class="flex justify-between">
-                        <span class="text-base-content/60">Started:</span>
-                        <span class="font-mono">{format_relative_time(task.started_at)}</span>
-                      </div>
-
-                      <%= if task.finished_at do %>
-                        <div class="flex justify-between">
-                          <span class="text-base-content/60">Finished:</span>
-                          <span class="font-mono">{format_relative_time(task.finished_at)}</span>
-                        </div>
-                      <% end %>
-
-                      <div class="flex justify-between">
-                        <span class="text-base-content/60">Duration:</span>
-                        <span class="font-mono font-bold">
-                          {format_duration(task.started_at, task.finished_at)}
-                        </span>
-                      </div>
-
-                      <%= if task.status == :error && task.result do %>
-                        <div class="alert alert-error mt-2">
-                          <div class="text-xs">
-                            <div class="font-bold">Error:</div>
-                            <div class="font-mono">{inspect(task.result)}</div>
-                          </div>
-                        </div>
-                      <% end %>
-
-                      <%= if task.status == :done && task.result do %>
-                        <div class="collapse collapse-arrow bg-base-200">
-                          <input type="checkbox" />
-                          <div class="collapse-title text-sm font-medium">
-                            View Result
-                          </div>
-                          <div class="collapse-content">
-                            <pre class="text-xs overflow-auto"><%= inspect(task.result, pretty: true) %></pre>
-                          </div>
-                        </div>
-                      <% end %>
-                    </div>
-
-                    <%= if length(task.logs) > 0 do %>
-                      <div class="divider my-2"></div>
-                      <div class="collapse collapse-arrow bg-base-200">
-                        <input type="checkbox" />
-                        <div class="collapse-title text-sm font-medium">
-                          Logs ({length(task.logs)})
-                        </div>
-                        <div class="collapse-content">
-                          <div class="space-y-1">
-                            <%= for {level, log} <- task.logs do %>
-                              <div class="text-xs">
-                                <span class="badge badge-xs">{level}</span>
-                                <span class="ml-2">{log}</span>
-                              </div>
-                            <% end %>
-                          </div>
-                        </div>
-                      </div>
-                    <% end %>
-
-                    <div class="card-actions justify-end mt-2">
-                      <button
-                        phx-click="discard_task"
-                        phx-value-ref={task.base_encoded_ref}
-                        class="btn btn-sm btn-ghost"
-                      >
-                        Discard
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              <% end %>
+        <!-- Kanban Board -->
+        <%= if length(@in_progress) > 0 or length(@completed) > 0 or length(@failed) > 0 do %>
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- In Progress Column -->
+            <div class="space-y-4">
+              <div class="sticky top-0 bg-warning/20 backdrop-blur-sm rounded-lg p-4 shadow-lg border-2 border-warning">
+                <h2 class="text-xl font-bold flex items-center gap-2">
+                  <span class="text-2xl">⚡</span>
+                  In Progress
+                  <span class="badge badge-warning">{length(@in_progress)}</span>
+                </h2>
+              </div>
+              <div class="space-y-4">
+                <%= for item <- @in_progress do %>
+                  <%= if is_task?(item) do %>
+                    <.task_card task={item} />
+                  <% else %>
+                    <.stream_card stream={item} />
+                  <% end %>
+                <% end %>
+              </div>
             </div>
-          </div>
-        <% end %>
-        
-    <!-- Streams Section -->
-        <%= if length(@overlord_streams) > 0 do %>
-          <div>
-            <h2 class="text-2xl font-bold mb-4">Streams</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <%= for stream <- @overlord_streams do %>
-                <div class="card bg-base-100 shadow-xl">
-                  <div class="card-body">
-                    <div class="flex justify-between items-start">
-                      <h3 class="card-title text-lg">{stream.heading}</h3>
-                      <span class={"badge #{status_class(stream.status)}"}>
-                        {status_display(stream.status)}
-                      </span>
-                    </div>
 
-                    <p class="text-sm text-base-content/70">{stream.message}</p>
+            <!-- Completed Column -->
+            <div class="space-y-4">
+              <div class="sticky top-0 bg-success/20 backdrop-blur-sm rounded-lg p-4 shadow-lg border-2 border-success">
+                <h2 class="text-xl font-bold flex items-center gap-2">
+                  <span class="text-2xl">✅</span>
+                  Completed
+                  <span class="badge badge-success">{length(@completed)}</span>
+                </h2>
+              </div>
+              <div class="space-y-4">
+                <%= for item <- @completed do %>
+                  <%= if is_task?(item) do %>
+                    <.task_card task={item} />
+                  <% else %>
+                    <.stream_card stream={item} />
+                  <% end %>
+                <% end %>
+              </div>
+            </div>
 
-                    <div class="divider my-2"></div>
-                    
-    <!-- Progress Bar -->
-                    <div class="space-y-2">
-                      <div class="flex justify-between text-sm">
-                        <span>Progress</span>
-                        <span class="font-mono">
-                          {stream.stream_completed}/{stream.stream_total}
-                        </span>
-                      </div>
-                      <progress
-                        class="progress progress-primary w-full"
-                        value={stream.stream_completed}
-                        max={stream.stream_total}
-                      >
-                      </progress>
-                      <%= if stream.stream_total > 0 do %>
-                        <div class="text-xs text-center">
-                          {Float.round(stream.stream_completed / stream.stream_total * 100, 1)}%
-                        </div>
-                      <% end %>
-                    </div>
-
-                    <div class="divider my-2"></div>
-
-                    <div class="space-y-2 text-sm">
-                      <div class="flex justify-between">
-                        <span class="text-base-content/60">Started:</span>
-                        <span class="font-mono">{format_relative_time(stream.started_at)}</span>
-                      </div>
-
-                      <%= if stream.finished_at do %>
-                        <div class="flex justify-between">
-                          <span class="text-base-content/60">Finished:</span>
-                          <span class="font-mono">{format_relative_time(stream.finished_at)}</span>
-                        </div>
-                      <% end %>
-
-                      <div class="flex justify-between">
-                        <span class="text-base-content/60">Duration:</span>
-                        <span class="font-mono font-bold">
-                          {format_duration(stream.started_at, stream.finished_at)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <%= if length(stream.logs) > 0 do %>
-                      <div class="divider my-2"></div>
-                      <div class="collapse collapse-arrow bg-base-200">
-                        <input type="checkbox" />
-                        <div class="collapse-title text-sm font-medium">
-                          Logs ({length(stream.logs)})
-                        </div>
-                        <div class="collapse-content">
-                          <div class="space-y-1">
-                            <%= for {level, log} <- stream.logs do %>
-                              <div class="text-xs">
-                                <span class="badge badge-xs">{level}</span>
-                                <span class="ml-2">{log}</span>
-                              </div>
-                            <% end %>
-                          </div>
-                        </div>
-                      </div>
-                    <% end %>
-
-                    <div class="card-actions justify-end mt-2">
-                      <button
-                        phx-click="discard_stream"
-                        phx-value-ref={stream.base_encoded_ref}
-                        class="btn btn-sm btn-ghost"
-                      >
-                        Discard
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              <% end %>
+            <!-- Failed Column -->
+            <div class="space-y-4">
+              <div class="sticky top-0 bg-error/20 backdrop-blur-sm rounded-lg p-4 shadow-lg border-2 border-error">
+                <h2 class="text-xl font-bold flex items-center gap-2">
+                  <span class="text-2xl">❌</span>
+                  Failed
+                  <span class="badge badge-error">{length(@failed)}</span>
+                </h2>
+              </div>
+              <div class="space-y-4">
+                <%= for item <- @failed do %>
+                  <%= if is_task?(item) do %>
+                    <.task_card task={item} />
+                  <% else %>
+                    <.stream_card stream={item} />
+                  <% end %>
+                <% end %>
+              </div>
             </div>
           </div>
         <% end %>
 
-        <%= if length(@tasks) == 0 and length(@overlord_streams) == 0 do %>
+        <%= if length(@in_progress) == 0 and length(@completed) == 0 and length(@failed) == 0 do %>
           <div class="hero bg-base-100 rounded-lg shadow-xl py-20">
             <div class="hero-content text-center">
               <div class="max-w-md">

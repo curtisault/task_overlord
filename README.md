@@ -1,4 +1,4 @@
-# TaskOverlord
+# TaskOverlord Demo
 
 To start your Phoenix server:
 

@@ -185,7 +185,7 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
       <div class="border border-green-500 p-3 mb-4 shadow-lg shadow-green-500/20">
         <div class="flex justify-between items-center">
           <div class="flex items-center gap-4">
-            <span class="text-green-300">▶ FINCHART TERMINAL v1.0</span>
+            <span class="text-green-300">▶ OVERLORD TERMINAL v1.0</span>
             <span class="text-cyan-400">
               [SESSION: {@session_id}]
             </span>
@@ -204,7 +204,7 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
         </div>
       </div>
 
-      <div class="grid grid-cols-12 gap-4">
+      <div class="grid grid-cols-12 gap-4 items-stretch min-h-[calc(100vh-12rem)]">
         <!-- Left Column: Task Monitor + Quick Actions -->
         <div class="col-span-5 space-y-4">
           <!-- Task Monitor -->
@@ -213,7 +213,7 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
 
             <%= if length(@tasks) > 0 do %>
               <div class="space-y-2 max-h-96 overflow-y-auto">
-                <%= for task <- Enum.take(@tasks, 10) do %>
+                <%= for task <- @tasks |> Enum.sort_by(& &1.started_at, {:desc, DateTime}) |> Enum.take(10) do %>
                   <div class="border-l-2 border-green-700 pl-2">
                     <div class="flex justify-between items-start">
                       <span class="text-green-300">
@@ -245,11 +245,12 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
           </div>
           
     <!-- Stream Monitor -->
-          <%= if length(@overlord_streams) > 0 do %>
-            <div class="border border-cyan-500 p-3 shadow-lg shadow-cyan-500/20">
-              <div class="text-cyan-400 mb-2">─── STREAM MONITOR ───</div>
+          <div class="border border-cyan-500 p-3 shadow-lg shadow-cyan-500/20">
+            <div class="text-cyan-400 mb-2">─── STREAM MONITOR ───</div>
+
+            <%= if length(@overlord_streams) > 0 do %>
               <div class="space-y-2">
-                <%= for stream <- Enum.take(@overlord_streams, 5) do %>
+                <%= for stream <- @overlord_streams |> Enum.sort_by(& &1.started_at, {:desc, DateTime}) |> Enum.take(5) do %>
                   <div class="border-l-2 border-cyan-700 pl-2">
                     <div class="flex justify-between items-start">
                       <span class="text-cyan-300">
@@ -271,98 +272,197 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
                   </div>
                 <% end %>
               </div>
-            </div>
-          <% end %>
+            <% else %>
+              <div class="text-gray-600 text-center py-8">
+                [NO ACTIVE STREAMS]
+              </div>
+            <% end %>
+          </div>
           
-    <!-- Quick Actions -->
-          <div class="border border-yellow-500 p-3 shadow-lg shadow-yellow-500/20">
-            <div class="text-yellow-400 mb-2">─── QUICK ACTIONS ───</div>
-            <div class="space-y-1">
-              <button
-                phx-click="action_new_task"
-                class="w-full text-left hover:bg-green-900/30 px-2 py-1"
-              >
-                [F1] NEW_TASK
-              </button>
-              <button
-                phx-click="action_stop_all"
-                class="w-full text-left hover:bg-green-900/30 px-2 py-1"
-              >
-                [F2] STOP_ALL
-              </button>
-              <button
-                phx-click="action_clear_done"
-                class="w-full text-left hover:bg-green-900/30 px-2 py-1"
-              >
-                [F3] CLEAR_DONE
-              </button>
-              <button
-                phx-click="action_export"
-                class="w-full text-left hover:bg-green-900/30 px-2 py-1"
-              >
-                [F4] EXPORT
-              </button>
+    <!-- Quick Actions + System Metrics -->
+          <div class="grid grid-cols-2 gap-4">
+            <!-- Quick Actions -->
+            <div class="border border-yellow-500 p-3 shadow-lg shadow-yellow-500/20">
+              <div class="text-yellow-400 mb-2">─── QUICK ACTIONS ───</div>
+              <div class="space-y-1">
+                <button
+                  phx-click="action_new_task"
+                  class="w-full text-left hover:bg-green-900/30 px-2 py-1"
+                >
+                  [F1] NEW_TASK
+                </button>
+                <button
+                  phx-click="action_stop_all"
+                  class="w-full text-left hover:bg-green-900/30 px-2 py-1"
+                >
+                  [F2] STOP_ALL
+                </button>
+                <button
+                  phx-click="action_clear_done"
+                  class="w-full text-left hover:bg-green-900/30 px-2 py-1"
+                >
+                  [F3] CLEAR_DONE
+                </button>
+                <button
+                  phx-click="action_export"
+                  class="w-full text-left hover:bg-green-900/30 px-2 py-1"
+                >
+                  [F4] EXPORT
+                </button>
+              </div>
+            </div>
+            
+    <!-- System Metrics -->
+            <div class="border border-green-500 p-3 shadow-lg shadow-green-500/20">
+              <div class="text-cyan-400 mb-2">─── SYSTEM METRICS ───</div>
+              <div class="space-y-2 text-sm">
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <div class="flex justify-between mb-1">
+                      <span class="text-gray-400 text-xs">CPU:</span>
+                      <span class="text-green-400 text-xs">{@stats.cpu_usage}%</span>
+                    </div>
+                    <div class="bg-gray-800 h-2 rounded">
+                      <div
+                        class="bg-green-500 h-2 rounded transition-all duration-300"
+                        style={"width: #{@stats.cpu_usage}%"}
+                      >
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div class="flex justify-between mb-1">
+                      <span class="text-gray-400 text-xs">MEM:</span>
+                      <span class="text-cyan-400 text-xs">{@stats.mem_usage}%</span>
+                    </div>
+                    <div class="bg-gray-800 h-2 rounded">
+                      <div
+                        class="bg-cyan-500 h-2 rounded transition-all duration-300"
+                        style={"width: #{@stats.mem_usage}%"}
+                      >
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pt-2 border-t border-gray-700 text-xs">
+                  <div class="flex justify-between">
+                    <span class="text-gray-400">TOTAL:</span>
+                    <span class="text-green-400">{@stats.total}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-400">RUNNING:</span>
+                    <span class="text-yellow-400">{@stats.running}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-400">DONE:</span>
+                    <span class="text-green-400">{@stats.done}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-400">ERROR:</span>
+                    <span class="text-red-400">{@stats.error}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           
-    <!-- System Metrics -->
+    <!-- Analytics -->
           <div class="border border-green-500 p-3 shadow-lg shadow-green-500/20">
-            <div class="text-cyan-400 mb-2">─── SYSTEM METRICS ───</div>
-            <div class="space-y-2 text-sm">
-              <div>
-                <div class="flex justify-between mb-1">
-                  <span class="text-gray-400">CPU:</span>
-                  <span class="text-green-400">{@stats.cpu_usage}%</span>
+            <div class="text-cyan-400 mb-2">─── ANALYTICS ───</div>
+            <div class="grid grid-cols-2 gap-4">
+              <!-- Left Column: Stats List -->
+              <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                  <div class="text-gray-400 text-sm">Total Tasks:</div>
+                  <div class="text-green-300 font-bold text-2xl">{@stats.total}</div>
                 </div>
-                <div class="bg-gray-800 h-2 rounded">
+                <div class="flex justify-between items-center">
+                  <div class="text-gray-400 text-sm">Completed:</div>
+                  <div class="text-green-300 font-bold text-2xl">{@stats.done}</div>
+                </div>
+                <div class="flex justify-between items-center">
+                  <div class="text-gray-400 text-sm">Active:</div>
+                  <div class="text-yellow-300 font-bold text-2xl">{@stats.running}</div>
+                </div>
+                <div class="flex justify-between items-center">
+                  <div class="text-gray-400 text-sm">Errors:</div>
+                  <div class="text-red-300 font-bold text-2xl">{@stats.error}</div>
+                </div>
+              </div>
+              
+    <!-- Right Column: Success Rate Bar -->
+              <div class="flex flex-col items-center justify-center">
+                <div class="text-gray-400 text-sm mb-2">Success Rate</div>
+                <% success_rate =
+                  if @stats.total > 0,
+                    do: round((@stats.total - @stats.error) / @stats.total * 100),
+                    else: 0 %>
+                <div class="h-32 w-16 bg-gray-800 rounded relative flex flex-col-reverse border border-gray-700">
                   <div
-                    class="bg-green-500 h-2 rounded transition-all duration-300"
-                    style={"width: #{@stats.cpu_usage}%"}
+                    class="bg-green-500 rounded transition-all duration-300"
+                    style={"height: #{success_rate}%"}
                   >
                   </div>
                 </div>
-              </div>
-
-              <div>
-                <div class="flex justify-between mb-1">
-                  <span class="text-gray-400">MEM:</span>
-                  <span class="text-cyan-400">{@stats.mem_usage}%</span>
-                </div>
-                <div class="bg-gray-800 h-2 rounded">
-                  <div
-                    class="bg-cyan-500 h-2 rounded transition-all duration-300"
-                    style={"width: #{@stats.mem_usage}%"}
-                  >
-                  </div>
-                </div>
-              </div>
-
-              <div class="pt-2 border-t border-gray-700">
-                <div class="flex justify-between">
-                  <span class="text-gray-400">TOTAL:</span>
-                  <span class="text-green-400">{@stats.total}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-400">RUNNING:</span>
-                  <span class="text-yellow-400">{@stats.running}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-400">DONE:</span>
-                  <span class="text-green-400">{@stats.done}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-400">ERROR:</span>
-                  <span class="text-red-400">{@stats.error}</span>
-                </div>
+                <div class="text-green-400 font-bold text-2xl mt-2">{success_rate}%</div>
               </div>
             </div>
           </div>
         </div>
         
-    <!-- Right Column: Live Feed + Analytics -->
-        <div class="col-span-7 space-y-4">
-          <!-- Live Feed -->
-          <div class="border border-green-500 p-3 shadow-lg shadow-green-500/20 h-[600px] flex flex-col">
+    <!-- Right Column: Command + Live Feed + Analytics -->
+        <div class="col-span-7 flex flex-col gap-4">
+          <!-- Command Line -->
+          <div class="border border-green-500 p-3 shadow-lg shadow-green-500/20">
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-cyan-400">─── COMMAND ───</div>
+              <%= if length(@command_suggestions) > 0 do %>
+                <div class="flex items-center gap-2 text-xs">
+                  <%= for {suggestion, index} <- Enum.with_index(@command_suggestions) do %>
+                    <span class={
+                      if index == @selected_suggestion_index,
+                        do: "text-yellow-400 font-bold",
+                        else: "text-gray-500"
+                    }>
+                      {suggestion}
+                    </span>
+                    <%= if index < length(@command_suggestions) - 1 do %>
+                      <span class="text-gray-700">|</span>
+                    <% end %>
+                  <% end %>
+                  <%= if length(@command_suggestions) > 1 do %>
+                    <span class="text-gray-600 text-xs ml-2">(Tab to cycle)</span>
+                  <% end %>
+                </div>
+              <% end %>
+            </div>
+            <form
+              phx-submit="execute_command"
+              phx-change="command_input_change"
+              class="flex items-center gap-2"
+            >
+              <span class="text-green-400">></span>
+              <input
+                id="command-input"
+                type="text"
+                value={@command_input}
+                class="flex-1 bg-black border-0 outline-none text-green-400"
+                placeholder="Enter command... (type 'help' or '\?' for commands)"
+                phx-hook="CommandInput"
+                name="value"
+                autocomplete="off"
+              />
+              <span class="animate-pulse">_</span>
+            </form>
+            <div class="text-xs text-gray-600 mt-2">
+              HOTKEYS: F1-F4 (Actions) | Tab (Autocomplete) | ↑/↓ (History) | ESC (Clear)
+            </div>
+          </div>
+          
+    <!-- Live Feed -->
+          <div class="border border-green-500 p-3 shadow-lg shadow-green-500/20 flex flex-col flex-1 min-h-0">
             <div class="text-cyan-400 mb-2">─── LIVE FEED ───</div>
             <div class="flex-1 overflow-y-auto space-y-1 text-sm">
               <%= if length(@feed_events) == 0 do %>
@@ -425,88 +525,6 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
               </div>
             </div>
           </div>
-          
-    <!-- Analytics -->
-          <div class="border border-green-500 p-3 shadow-lg shadow-green-500/20">
-            <div class="text-cyan-400 mb-2">─── ANALYTICS ───</div>
-            <div class="grid grid-cols-2 gap-4">
-              <div class="border border-gray-700 p-3">
-                <div class="text-green-300 font-bold text-2xl">{@stats.total}</div>
-                <div class="text-xs text-gray-500">Total Tasks</div>
-              </div>
-              <div class="border border-gray-700 p-3">
-                <div class="text-yellow-300 font-bold text-2xl">{@stats.running}</div>
-                <div class="text-xs text-gray-500">Active</div>
-              </div>
-              <div class="border border-gray-700 p-3">
-                <div class="text-green-300 font-bold text-2xl">{@stats.done}</div>
-                <div class="text-xs text-gray-500">Completed</div>
-              </div>
-              <div class="border border-gray-700 p-3">
-                <div class="text-red-300 font-bold text-2xl">{@stats.error}</div>
-                <div class="text-xs text-gray-500">Errors</div>
-              </div>
-            </div>
-            
-    <!-- Success Rate Chart -->
-            <div class="mt-4 border border-gray-700 p-3">
-              <div class="text-xs text-gray-400 mb-2">Success Rate</div>
-              <div class="flex items-end gap-1 h-20">
-                <%= for i <- 1..20 do %>
-                  <% height =
-                    cond do
-                      @stats.total == 0 -> 0
-                      rem(i, 3) == 0 -> Enum.random(40..100)
-                      true -> Enum.random(60..95)
-                    end %>
-                  <div class="flex-1 bg-green-600 transition-all" style={"height: #{height}%"}></div>
-                <% end %>
-              </div>
-            </div>
-          </div>
-          
-    <!-- Command Line -->
-          <div class="border border-green-500 p-3 shadow-lg shadow-green-500/20">
-            <div class="flex items-center justify-between mb-2">
-              <div class="text-cyan-400">─── COMMAND ───</div>
-              <%= if length(@command_suggestions) > 0 do %>
-                <div class="flex items-center gap-2 text-xs">
-                  <%= for {suggestion, index} <- Enum.with_index(@command_suggestions) do %>
-                    <span class={
-                      if index == @selected_suggestion_index,
-                        do: "text-yellow-400 font-bold",
-                        else: "text-gray-500"
-                    }>
-                      {suggestion}
-                    </span>
-                    <%= if index < length(@command_suggestions) - 1 do %>
-                      <span class="text-gray-700">|</span>
-                    <% end %>
-                  <% end %>
-                  <%= if length(@command_suggestions) > 1 do %>
-                    <span class="text-gray-600 text-xs ml-2">(Tab to cycle)</span>
-                  <% end %>
-                </div>
-              <% end %>
-            </div>
-            <form phx-submit="execute_command" phx-change="command_input_change" class="flex items-center gap-2">
-              <span class="text-green-400">></span>
-              <input
-                id="command-input"
-                type="text"
-                value={@command_input}
-                class="flex-1 bg-black border-0 outline-none text-green-400"
-                placeholder="Enter command... (type 'help' or '\?' for commands)"
-                phx-hook="CommandInput"
-                name="value"
-                autocomplete="off"
-              />
-              <span class="animate-pulse">_</span>
-            </form>
-            <div class="text-xs text-gray-600 mt-2">
-              HOTKEYS: F1-F4 (Actions) | Tab (Autocomplete) | ↑/↓ (History) | ESC (Clear)
-            </div>
-          </div>
         </div>
       </div>
       
@@ -514,17 +532,17 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
       <div class="border border-green-500 p-2 mt-4 flex justify-between text-xs shadow-lg shadow-green-500/20">
         <div class="flex gap-4">
           <span class="text-green-400">STATUS: ONLINE</span>
-          <span class="text-cyan-400">CONNECTED TO: TASK_OVERLORD</span>
+          <span class="text-cyan-400">ACTIVE: {@stats.running} tasks/streams</span>
+          <span class="text-yellow-400">EVENTS: {length(@feed_events)}</span>
         </div>
         <div class="flex gap-4">
-          <span class="text-yellow-400">LATENCY: 12ms</span>
           <span class="text-green-400">
             UPTIME: {format_duration_ms(System.system_time(:millisecond))}
           </span>
         </div>
       </div>
-
-      <!-- Help Modal -->
+      
+    <!-- Help Modal -->
       <%= if @show_help_modal do %>
         <div
           class="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
@@ -781,7 +799,10 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
     else
       # Unknown command
       socket
-      |> put_flash(:error, "Unknown command: #{command_text}. Type 'help' or '\\?' to see available commands.")
+      |> put_flash(
+        :error,
+        "Unknown command: #{command_text}. Type 'help' or '\\?' to see available commands."
+      )
       |> assign(:command_input, "")
       |> push_event("update_input_value", %{value: ""})
       |> then(&{:noreply, &1})
@@ -795,30 +816,25 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
       :stop_all -> handle_command_stop_all(socket)
       :clear_done -> handle_command_clear_done(socket)
       :export -> handle_command_export(socket)
-
       # Task/Stream Management
       :list_tasks -> handle_command_list_tasks(socket)
       :list_streams -> handle_command_list_streams(socket)
       :list_all -> handle_command_list_all(socket)
       :stats -> handle_command_stats(socket)
       :refresh -> handle_command_refresh(socket)
-
       # Navigation
       :navigate_cards -> {:noreply, push_navigate(socket, to: "/dashboard/cards")}
       :navigate_timeline -> {:noreply, push_navigate(socket, to: "/dashboard/timeline")}
       :navigate_terminal -> {:noreply, put_flash(socket, :info, "Already on Terminal view")}
-
       # View Control
       :filter_running -> handle_command_filter(socket, :running)
       :filter_done -> handle_command_filter(socket, :done)
       :filter_errors -> handle_command_filter(socket, :errors)
       :filter_all -> handle_command_filter(socket, :all)
-
       # System/Help
       :show_help -> {:noreply, assign(socket, :show_help_modal, true)}
       :show_status -> handle_command_status(socket)
       :clear_feed -> handle_command_clear_feed(socket)
-
       _ -> {:noreply, put_flash(socket, :error, "Command not implemented yet")}
     end
   end
@@ -848,7 +864,9 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
     {:noreply,
      socket
      |> put_flash(:info, "Stopped #{count} running task(s)")
-     |> add_feed_event({:command_executed, "STOP_ALL: #{count} tasks stopped", DateTime.utc_now()})}
+     |> add_feed_event(
+       {:command_executed, "STOP_ALL: #{count} tasks stopped", DateTime.utc_now()}
+     )}
   end
 
   defp handle_command_clear_done(socket) do
@@ -878,7 +896,9 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
     {:noreply,
      socket
      |> put_flash(:info, "Cleared #{total} completed item(s)")
-     |> add_feed_event({:command_executed, "CLEAR_DONE: #{total} items cleared", DateTime.utc_now()})}
+     |> add_feed_event(
+       {:command_executed, "CLEAR_DONE: #{total} items cleared", DateTime.utc_now()}
+     )}
   end
 
   defp handle_command_export(socket) do

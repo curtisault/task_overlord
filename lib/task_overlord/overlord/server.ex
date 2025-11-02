@@ -13,8 +13,9 @@ defmodule TaskOverlord.Server do
 
   require Logger
 
-  @topic __MODULE__
+  @topic "task_overlord_server"
   @discard_interval :timer.seconds(1)
+  @demo_interval :timer.seconds(5)
 
   # Client API
 
@@ -159,6 +160,7 @@ defmodule TaskOverlord.Server do
   @impl true
   def init(_) do
     Process.send_after(self(), :discard_outdated, @discard_interval)
+    Process.send_after(self(), :create_demo_tasks, @demo_interval)
     {:ok, %{tasks: %{}, streams: %{}}}
   end
 
@@ -400,6 +402,81 @@ defmodule TaskOverlord.Server do
         new_state = %{state | tasks: new_tasks}
         {:noreply, broadcast(new_state)}
     end
+  end
+
+  # Demo task generator
+  def handle_info(:create_demo_tasks, state) do
+    # Create a demo task
+    task_types = ["Data Processing", "API Call", "File Upload", "Report Generation", "Email Sending"]
+    task_type = Enum.random(task_types)
+
+    # Create task function with error handling wrapper
+    wrapped_func = fn ->
+      try do
+        # Random sleep between 2-8 seconds
+        sleep_time = Enum.random(2000..8000)
+        Process.sleep(sleep_time)
+
+        # 80% success rate
+        result = if :rand.uniform() < 0.8 do
+          "Task completed successfully in #{sleep_time}ms"
+        else
+          raise "Random error occurred"
+        end
+
+        {:ok, result}
+      rescue
+        e ->
+          {:error, {e, __STACKTRACE__}}
+      catch
+        kind, reason ->
+          {:error, {kind, reason, __STACKTRACE__}}
+      end
+    end
+
+    # Start the task directly
+    task = Task.Supervisor.async_nolink(TaskOverlord.TaskSupervisor, wrapped_func)
+    task_struct = OverlordTask.new(task, task_type, "Processing #{Enum.random(100..999)} items")
+    new_tasks = Map.put(state.tasks, task.ref, task_struct)
+
+    # Create a demo stream
+    stream_ref = make_ref()
+    stream_total = 5
+
+    stream = %OverlordStream{
+      ref: stream_ref,
+      base_encoded_ref: :erlang.term_to_binary(stream_ref) |> Base.url_encode64(padding: false),
+      mfa: {__MODULE__, :demo_stream, []},
+      status: :streaming,
+      heading: "Data Stream",
+      message: "Streaming #{stream_total} records",
+      stream_completed: 0,
+      stream_total: stream_total,
+      stream_results: [],
+      logs: [],
+      started_at: DateTime.utc_now(),
+      finished_at: nil,
+      expires_at_unix: DateTime.utc_now() |> DateTime.add(:timer.minutes(5), :millisecond) |> DateTime.to_unix()
+    }
+
+    # Add stream to state
+    new_streams = Map.put(state.streams, stream_ref, stream)
+
+    updated_state = %{state | tasks: new_tasks, streams: new_streams}
+
+    # Spawn a process to simulate stream items
+    spawn(fn ->
+      Enum.each(1..stream_total, fn i ->
+        Process.sleep(Enum.random(500..1500))
+        stream_item(stream_ref, {:ok, "Item #{i}"})
+      end)
+      complete_stream(stream_ref)
+    end)
+
+    # Schedule next demo
+    Process.send_after(self(), :create_demo_tasks, @demo_interval)
+
+    {:noreply, broadcast(updated_state)}
   end
 
   # Catch-all for debugging unhandled messages

@@ -18,6 +18,10 @@ defmodule TaskOverlordWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+
+    live "/dashboard/cards", Dashboard.CardsLive
+    live "/dashboard/timeline", Dashboard.TimelineLive
+    live "/dashboard/terminal", Dashboard.TerminalLive
   end
 
   # Other scopes may use custom stacks.

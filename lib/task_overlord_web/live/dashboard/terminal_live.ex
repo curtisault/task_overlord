@@ -1,6 +1,8 @@
 defmodule TaskOverlordWeb.Dashboard.TerminalLive do
   use TaskOverlordWeb, :live_view
   alias TaskOverlord.Server
+  alias TaskOverlordWeb.Dashboard.Commands
+  alias TaskOverlordWeb.Dashboard.CommandSearch
 
   @impl true
   def mount(_params, _session, socket) do
@@ -18,6 +20,13 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
      |> assign(:current_time, DateTime.utc_now())
      |> assign(:session_id, generate_session_id())
      |> assign(:feed_events, [])
+     |> assign(:command_input, "")
+     |> assign(:command_suggestions, [])
+     |> assign(:selected_suggestion_index, 0)
+     |> assign(:command_history, [])
+     |> assign(:history_index, -1)
+     |> assign(:show_help_modal, false)
+     |> assign(:active_filter, :all)
      |> assign_stats()}
   end
 
@@ -362,38 +371,50 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
                 </div>
               <% end %>
 
-              <%= for {event_type, item, timestamp} <- @feed_events do %>
+              <%= for event <- @feed_events do %>
                 <div class="flex gap-2">
-                  <span class="text-gray-500">[{format_timestamp(timestamp)}]</span>
-                  <%= case event_type do %>
-                    <% :task_started -> %>
-                      <span class="text-cyan-400">TASK_START:</span>
-                      <span class="text-green-300">{item.heading} started</span>
-                    <% :task_completed -> %>
-                      <span class="text-green-400">TASK_DONE:</span>
-                      <span class="text-green-300">
-                        {item.heading} completed in {format_duration_ms(
-                          DateTime.diff(item.finished_at, item.started_at, :millisecond)
-                        )}
-                      </span>
-                    <% :task_failed -> %>
-                      <span class="text-red-400">TASK_ERROR:</span>
-                      <span class="text-red-300">{item.heading} failed</span>
-                    <% :stream_started -> %>
-                      <span class="text-cyan-400">STREAM_START:</span>
-                      <span class="text-cyan-300">
-                        {item.heading} started ({item.stream_total} items)
-                      </span>
-                    <% :stream_completed -> %>
-                      <span class="text-green-400">STREAM_DONE:</span>
-                      <span class="text-green-300">
-                        {item.heading} completed {item.stream_completed} items
-                      </span>
-                    <% :stream_progress -> %>
-                      <span class="text-yellow-400">STREAM_PROGRESS:</span>
-                      <span class="text-yellow-300">
-                        {item.heading} - {item.stream_completed}/{item.stream_total}
-                      </span>
+                  <%= case event do %>
+                    <% {event_type, item, timestamp} when is_map(item) -> %>
+                      <span class="text-gray-500">[{format_timestamp(timestamp)}]</span>
+                      <%= case event_type do %>
+                        <% :task_started -> %>
+                          <span class="text-cyan-400">TASK_START:</span>
+                          <span class="text-green-300">{item.heading} started</span>
+                        <% :task_completed -> %>
+                          <span class="text-green-400">TASK_DONE:</span>
+                          <span class="text-green-300">
+                            {item.heading} completed in {format_duration_ms(
+                              DateTime.diff(item.finished_at, item.started_at, :millisecond)
+                            )}
+                          </span>
+                        <% :task_failed -> %>
+                          <span class="text-red-400">TASK_ERROR:</span>
+                          <span class="text-red-300">{item.heading} failed</span>
+                        <% :stream_started -> %>
+                          <span class="text-cyan-400">STREAM_START:</span>
+                          <span class="text-cyan-300">
+                            {item.heading} started ({item.stream_total} items)
+                          </span>
+                        <% :stream_completed -> %>
+                          <span class="text-green-400">STREAM_DONE:</span>
+                          <span class="text-green-300">
+                            {item.heading} completed {item.stream_completed} items
+                          </span>
+                        <% :stream_progress -> %>
+                          <span class="text-yellow-400">STREAM_PROGRESS:</span>
+                          <span class="text-yellow-300">
+                            {item.heading} - {item.stream_completed}/{item.stream_total}
+                          </span>
+                        <% _ -> %>
+                          <span class="text-gray-400">UNKNOWN</span>
+                      <% end %>
+                    <% {:command_executed, message, timestamp} -> %>
+                      <span class="text-gray-500">[{format_timestamp(timestamp)}]</span>
+                      <span class="text-yellow-400">COMMAND:</span>
+                      <span class="text-yellow-300">{message}</span>
+                    <% _ -> %>
+                      <span class="text-gray-500">[{format_timestamp(@current_time)}]</span>
+                      <span class="text-gray-400">UNKNOWN EVENT</span>
                   <% end %>
                 </div>
               <% end %>
@@ -446,20 +467,44 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
           
     <!-- Command Line -->
           <div class="border border-green-500 p-3 shadow-lg shadow-green-500/20">
-            <div class="text-cyan-400 mb-2">─── COMMAND ───</div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-cyan-400">─── COMMAND ───</div>
+              <%= if length(@command_suggestions) > 0 do %>
+                <div class="flex items-center gap-2 text-xs">
+                  <%= for {suggestion, index} <- Enum.with_index(@command_suggestions) do %>
+                    <span class={
+                      if index == @selected_suggestion_index,
+                        do: "text-yellow-400 font-bold",
+                        else: "text-gray-500"
+                    }>
+                      {suggestion}
+                    </span>
+                    <%= if index < length(@command_suggestions) - 1 do %>
+                      <span class="text-gray-700">|</span>
+                    <% end %>
+                  <% end %>
+                  <%= if length(@command_suggestions) > 1 do %>
+                    <span class="text-gray-600 text-xs ml-2">(Tab to cycle)</span>
+                  <% end %>
+                </div>
+              <% end %>
+            </div>
+            <form phx-submit="execute_command" phx-change="command_input_change" class="flex items-center gap-2">
               <span class="text-green-400">></span>
               <input
+                id="command-input"
                 type="text"
+                value={@command_input}
                 class="flex-1 bg-black border-0 outline-none text-green-400"
-                placeholder="Enter command..."
-                phx-keydown="execute_command"
-                phx-key="Enter"
+                placeholder="Enter command... (type 'help' or '\?' for commands)"
+                phx-hook="CommandInput"
+                name="value"
+                autocomplete="off"
               />
               <span class="animate-pulse">_</span>
-            </div>
+            </form>
             <div class="text-xs text-gray-600 mt-2">
-              HOTKEYS: F1-F4 (Actions) | CTRL+L (Clear) | ESC (Menu)
+              HOTKEYS: F1-F4 (Actions) | Tab (Autocomplete) | ↑/↓ (History) | ESC (Clear)
             </div>
           </div>
         </div>
@@ -478,6 +523,94 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
           </span>
         </div>
       </div>
+
+      <!-- Help Modal -->
+      <%= if @show_help_modal do %>
+        <div
+          class="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+          phx-click="close_help_modal"
+        >
+          <div
+            class="bg-black border-2 border-green-500 p-6 max-w-5xl max-h-[90vh] overflow-y-auto shadow-2xl shadow-green-500/50"
+            phx-click={JS.exec("phx-remove", to: ".modal-backdrop")}
+            style="font-family: 'Courier New', monospace;"
+          >
+            <div class="flex justify-between items-center mb-4 border-b border-green-500 pb-2">
+              <h2 class="text-2xl text-green-400 font-bold">
+                ▸ AVAILABLE COMMANDS
+              </h2>
+              <button
+                phx-click="close_help_modal"
+                class="text-red-400 hover:text-red-300 text-xl font-bold"
+              >
+                [X]
+              </button>
+            </div>
+
+            <%= for {category, commands} <- Commands.commands_by_category() do %>
+              <div class="mb-6">
+                <h3 class="text-cyan-400 font-bold mb-3 text-lg">
+                  ═══ {category} ═══
+                </h3>
+                <div class="space-y-3">
+                  <%= for command <- commands do %>
+                    <div class="border-l-2 border-green-700 pl-4 py-2">
+                      <div class="flex items-start gap-4">
+                        <div class="w-48">
+                          <div class="text-yellow-400 font-bold">
+                            {command.name}
+                          </div>
+                          <%= if length(command.aliases) > 0 do %>
+                            <div class="text-gray-500 text-xs">
+                              Aliases: {Enum.join(command.aliases, ", ")}
+                            </div>
+                          <% end %>
+                          <%= if command.keyboard_shortcut do %>
+                            <div class="text-cyan-400 text-xs mt-1">
+                              [{command.keyboard_shortcut}]
+                            </div>
+                          <% end %>
+                        </div>
+                        <div class="flex-1">
+                          <div class="text-green-300">
+                            {command.description}
+                          </div>
+                          <div class="text-gray-500 text-sm mt-1">
+                            Usage: <span class="text-green-400">{command.usage_example}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  <% end %>
+                </div>
+              </div>
+            <% end %>
+
+            <div class="border-t border-green-500 pt-4 mt-4">
+              <div class="text-gray-400 text-sm">
+                <div class="font-bold text-cyan-400 mb-2">TIPS:</div>
+                <ul class="list-disc list-inside space-y-1 text-xs">
+                  <li>Type '\\?' or 'help' to show this dialog</li>
+                  <li>Start typing any command name for autocomplete suggestions</li>
+                  <li>Press Tab to cycle through suggestions</li>
+                  <li>Use ↑/↓ arrows to navigate command history</li>
+                  <li>Press ESC to clear the input field</li>
+                  <li>Commands are case-insensitive</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="text-center mt-4">
+              <button
+                phx-click="close_help_modal"
+                class="px-6 py-2 border border-green-500 text-green-400 hover:bg-green-900/30"
+              >
+                [CLOSE - ESC]
+              </button>
+            </div>
+          </div>
+        </div>
+      <% end %>
     </div>
     """
   end
@@ -524,9 +657,322 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
     {:noreply, socket}
   end
 
+  # Command input handlers
+
   @impl true
-  def handle_event("execute_command", _params, socket) do
-    # Placeholder for command execution
-    {:noreply, socket}
+  def handle_event("command_input_change", %{"value" => value}, socket) do
+    # Search for matching commands
+    suggestions = CommandSearch.search(value)
+
+    {:noreply,
+     socket
+     |> assign(:command_input, value)
+     |> assign(:command_suggestions, suggestions)
+     |> assign(:selected_suggestion_index, 0)
+     |> assign(:history_index, -1)}
+  end
+
+  @impl true
+  def handle_event("command_tab", _params, socket) do
+    suggestions = socket.assigns.command_suggestions
+
+    if length(suggestions) > 0 do
+      # Cycle to next suggestion
+      current_index = socket.assigns.selected_suggestion_index
+      next_index = rem(current_index + 1, length(suggestions))
+      selected_command = Enum.at(suggestions, next_index)
+
+      # Push event to update input value via JS hook
+      {:noreply,
+       socket
+       |> assign(:selected_suggestion_index, next_index)
+       |> assign(:command_input, selected_command)
+       |> push_event("update_input_value", %{value: selected_command})}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_event("command_arrow_up", _params, socket) do
+    history = socket.assigns.command_history
+
+    if length(history) > 0 do
+      current_index = socket.assigns.history_index
+      next_index = min(current_index + 1, length(history) - 1)
+      command = Enum.at(history, next_index)
+
+      {:noreply,
+       socket
+       |> assign(:history_index, next_index)
+       |> assign(:command_input, command)
+       |> push_event("update_input_value", %{value: command})}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_event("command_arrow_down", _params, socket) do
+    current_index = socket.assigns.history_index
+
+    if current_index > 0 do
+      next_index = current_index - 1
+      command = Enum.at(socket.assigns.command_history, next_index)
+
+      {:noreply,
+       socket
+       |> assign(:history_index, next_index)
+       |> assign(:command_input, command)
+       |> push_event("update_input_value", %{value: command})}
+    else
+      # Back to empty input
+      {:noreply,
+       socket
+       |> assign(:history_index, -1)
+       |> assign(:command_input, "")
+       |> push_event("update_input_value", %{value: ""})}
+    end
+  end
+
+  @impl true
+  def handle_event("execute_command", %{"value" => value}, socket) do
+    command_text = String.trim(value)
+
+    cond do
+      # Empty command
+      command_text == "" ->
+        {:noreply, socket}
+
+      # Help command - show modal
+      CommandSearch.is_help_command?(command_text) ->
+        {:noreply, assign(socket, :show_help_modal, true)}
+
+      # Normal command - find and execute
+      true ->
+        execute_terminal_command(command_text, socket)
+    end
+  end
+
+  @impl true
+  def handle_event("close_help_modal", _params, socket) do
+    {:noreply, assign(socket, :show_help_modal, false)}
+  end
+
+  defp execute_terminal_command(command_text, socket) do
+    # Find the command
+    command = Commands.find_command(command_text)
+
+    if command do
+      # Add to history
+      history = [command_text | socket.assigns.command_history] |> Enum.take(50)
+
+      socket =
+        socket
+        |> assign(:command_history, history)
+        |> assign(:command_input, "")
+        |> assign(:command_suggestions, [])
+        |> assign(:selected_suggestion_index, 0)
+        |> assign(:history_index, -1)
+        |> push_event("update_input_value", %{value: ""})
+
+      # Execute the command handler
+      execute_command_handler(command.handler, socket)
+    else
+      # Unknown command
+      socket
+      |> put_flash(:error, "Unknown command: #{command_text}. Type 'help' or '\\?' to see available commands.")
+      |> assign(:command_input, "")
+      |> push_event("update_input_value", %{value: ""})
+      |> then(&{:noreply, &1})
+    end
+  end
+
+  defp execute_command_handler(handler, socket) do
+    case handler do
+      # Quick Actions
+      :new_task -> handle_command_new_task(socket)
+      :stop_all -> handle_command_stop_all(socket)
+      :clear_done -> handle_command_clear_done(socket)
+      :export -> handle_command_export(socket)
+
+      # Task/Stream Management
+      :list_tasks -> handle_command_list_tasks(socket)
+      :list_streams -> handle_command_list_streams(socket)
+      :list_all -> handle_command_list_all(socket)
+      :stats -> handle_command_stats(socket)
+      :refresh -> handle_command_refresh(socket)
+
+      # Navigation
+      :navigate_cards -> {:noreply, push_navigate(socket, to: "/dashboard/cards")}
+      :navigate_timeline -> {:noreply, push_navigate(socket, to: "/dashboard/timeline")}
+      :navigate_terminal -> {:noreply, put_flash(socket, :info, "Already on Terminal view")}
+
+      # View Control
+      :filter_running -> handle_command_filter(socket, :running)
+      :filter_done -> handle_command_filter(socket, :done)
+      :filter_errors -> handle_command_filter(socket, :errors)
+      :filter_all -> handle_command_filter(socket, :all)
+
+      # System/Help
+      :show_help -> {:noreply, assign(socket, :show_help_modal, true)}
+      :show_status -> handle_command_status(socket)
+      :clear_feed -> handle_command_clear_feed(socket)
+
+      _ -> {:noreply, put_flash(socket, :error, "Command not implemented yet")}
+    end
+  end
+
+  # Command handler implementations
+
+  defp handle_command_new_task(socket) do
+    # Placeholder - would integrate with a task creation form
+    {:noreply,
+     socket
+     |> put_flash(:info, "New task command executed. Task creation coming soon!")
+     |> add_feed_event({:command_executed, "NEW_TASK", DateTime.utc_now()})}
+  end
+
+  defp handle_command_stop_all(socket) do
+    # Stop all running tasks
+    count =
+      Enum.count(socket.assigns.tasks, fn task ->
+        if task.status == :running do
+          Server.discard_task(task.base_encoded_ref)
+          true
+        else
+          false
+        end
+      end)
+
+    {:noreply,
+     socket
+     |> put_flash(:info, "Stopped #{count} running task(s)")
+     |> add_feed_event({:command_executed, "STOP_ALL: #{count} tasks stopped", DateTime.utc_now()})}
+  end
+
+  defp handle_command_clear_done(socket) do
+    # Clear all completed tasks and streams
+    task_count =
+      Enum.count(socket.assigns.tasks, fn task ->
+        if task.status == :done do
+          Server.discard_task(task.base_encoded_ref)
+          true
+        else
+          false
+        end
+      end)
+
+    stream_count =
+      Enum.count(socket.assigns.overlord_streams, fn stream ->
+        if stream.status == :done do
+          Server.discard_stream(stream.base_encoded_ref)
+          true
+        else
+          false
+        end
+      end)
+
+    total = task_count + stream_count
+
+    {:noreply,
+     socket
+     |> put_flash(:info, "Cleared #{total} completed item(s)")
+     |> add_feed_event({:command_executed, "CLEAR_DONE: #{total} items cleared", DateTime.utc_now()})}
+  end
+
+  defp handle_command_export(socket) do
+    # Placeholder - would generate export file
+    {:noreply,
+     socket
+     |> put_flash(:info, "Export command executed. Export functionality coming soon!")
+     |> add_feed_event({:command_executed, "EXPORT", DateTime.utc_now()})}
+  end
+
+  defp handle_command_list_tasks(socket) do
+    tasks = socket.assigns.tasks
+    count = length(tasks)
+
+    {:noreply,
+     socket
+     |> put_flash(:info, "#{count} task(s) listed in feed")
+     |> add_feed_event({:command_executed, "LIST_TASKS: #{count} tasks", DateTime.utc_now()})}
+  end
+
+  defp handle_command_list_streams(socket) do
+    streams = socket.assigns.overlord_streams
+    count = length(streams)
+
+    {:noreply,
+     socket
+     |> put_flash(:info, "#{count} stream(s) listed in feed")
+     |> add_feed_event({:command_executed, "LIST_STREAMS: #{count} streams", DateTime.utc_now()})}
+  end
+
+  defp handle_command_list_all(socket) do
+    total = length(socket.assigns.tasks) + length(socket.assigns.overlord_streams)
+
+    {:noreply,
+     socket
+     |> put_flash(:info, "#{total} total item(s) listed in feed")
+     |> add_feed_event({:command_executed, "LIST_ALL: #{total} items", DateTime.utc_now()})}
+  end
+
+  defp handle_command_stats(socket) do
+    stats = socket.assigns.stats
+
+    message =
+      "STATS: #{stats.total} total, #{stats.running} running, #{stats.done} done, #{stats.error} errors"
+
+    {:noreply,
+     socket
+     |> put_flash(:info, message)
+     |> add_feed_event({:command_executed, message, DateTime.utc_now()})}
+  end
+
+  defp handle_command_refresh(socket) do
+    {:noreply,
+     socket
+     |> put_flash(:info, "Dashboard refreshed")
+     |> add_feed_event({:command_executed, "REFRESH", DateTime.utc_now()})}
+  end
+
+  defp handle_command_filter(socket, filter) do
+    filter_name =
+      case filter do
+        :running -> "RUNNING"
+        :done -> "DONE"
+        :errors -> "ERRORS"
+        :all -> "ALL"
+      end
+
+    {:noreply,
+     socket
+     |> assign(:active_filter, filter)
+     |> put_flash(:info, "Filter set to: #{filter_name}")
+     |> add_feed_event({:command_executed, "FILTER: #{filter_name}", DateTime.utc_now()})}
+  end
+
+  defp handle_command_status(socket) do
+    stats = socket.assigns.stats
+
+    message =
+      "STATUS: ONLINE | #{stats.total} tasks | #{stats.running} running | CPU: #{stats.cpu_usage}% | MEM: #{stats.mem_usage}%"
+
+    {:noreply,
+     socket
+     |> put_flash(:info, message)
+     |> add_feed_event({:command_executed, message, DateTime.utc_now()})}
+  end
+
+  defp handle_command_clear_feed(socket) do
+    {:noreply,
+     socket
+     |> assign(:feed_events, [])
+     |> put_flash(:info, "Live feed cleared")}
+  end
+
+  defp add_feed_event(socket, event) do
+    assign(socket, :feed_events, [event | socket.assigns.feed_events] |> Enum.take(20))
   end
 end

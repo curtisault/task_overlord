@@ -24,10 +24,12 @@ import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/task_overlord"
 import { TimeUntil } from "./hooks/time_until";
+import CommandInput from "./hooks/command_input";
 import topbar from "../vendor/topbar"
 
 const Hooks = {
   TimeUntil,
+  CommandInput,
   colocatedHooks
 };
 

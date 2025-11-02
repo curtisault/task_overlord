@@ -17,7 +17,8 @@ defmodule TaskOverlordWeb.Router do
   scope "/", TaskOverlordWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
+    live "/", Dashboard.HomeLive
+    get "/phoenix", PageController, :home
 
     live "/dashboard/cards", Dashboard.CardsLive
     live "/dashboard/timeline", Dashboard.TimelineLive

@@ -242,8 +242,8 @@ defmodule TaskOverlordWeb.Dashboard.CardsLive do
         <p class="text-sm text-base-content/70">{@stream.message}</p>
 
         <div class="divider my-2"></div>
-
-        <!-- Progress Bar -->
+        
+    <!-- Progress Bar -->
         <div class="space-y-2">
           <div class="flex justify-between text-sm">
             <span>Progress</span>
@@ -334,8 +334,8 @@ defmodule TaskOverlordWeb.Dashboard.CardsLive do
             <.link navigate="/dashboard/terminal" class="btn btn-ghost">Terminal</.link>
           </div>
         </div>
-
-        <!-- Stats Overview -->
+        
+    <!-- Stats Overview -->
         <div class="stats shadow w-full">
           <div class="stat">
             <div class="stat-title">Total Tasks</div>
@@ -363,8 +363,8 @@ defmodule TaskOverlordWeb.Dashboard.CardsLive do
             <div class="stat-desc">Task completion</div>
           </div>
         </div>
-
-        <!-- Kanban Board -->
+        
+    <!-- Kanban Board -->
         <%= if length(@in_progress) > 0 or length(@completed) > 0 or length(@failed) > 0 do %>
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <!-- In Progress Column -->
@@ -372,8 +372,7 @@ defmodule TaskOverlordWeb.Dashboard.CardsLive do
               <div class="sticky top-0 bg-warning/20 backdrop-blur-sm rounded-lg p-4 shadow-lg border-2 border-warning">
                 <h2 class="text-xl font-bold flex items-center gap-2">
                   <span class="text-2xl">⚡</span>
-                  In Progress
-                  <span class="badge badge-warning">{length(@in_progress)}</span>
+                  In Progress <span class="badge badge-warning">{length(@in_progress)}</span>
                 </h2>
               </div>
               <div class="space-y-4">
@@ -386,14 +385,13 @@ defmodule TaskOverlordWeb.Dashboard.CardsLive do
                 <% end %>
               </div>
             </div>
-
-            <!-- Completed Column -->
+            
+    <!-- Completed Column -->
             <div class="space-y-4">
               <div class="sticky top-0 bg-success/20 backdrop-blur-sm rounded-lg p-4 shadow-lg border-2 border-success">
                 <h2 class="text-xl font-bold flex items-center gap-2">
                   <span class="text-2xl">✅</span>
-                  Completed
-                  <span class="badge badge-success">{length(@completed)}</span>
+                  Completed <span class="badge badge-success">{length(@completed)}</span>
                 </h2>
               </div>
               <div class="space-y-4">
@@ -406,14 +404,13 @@ defmodule TaskOverlordWeb.Dashboard.CardsLive do
                 <% end %>
               </div>
             </div>
-
-            <!-- Failed Column -->
+            
+    <!-- Failed Column -->
             <div class="space-y-4">
               <div class="sticky top-0 bg-error/20 backdrop-blur-sm rounded-lg p-4 shadow-lg border-2 border-error">
                 <h2 class="text-xl font-bold flex items-center gap-2">
                   <span class="text-2xl">❌</span>
-                  Failed
-                  <span class="badge badge-error">{length(@failed)}</span>
+                  Failed <span class="badge badge-error">{length(@failed)}</span>
                 </h2>
               </div>
               <div class="space-y-4">

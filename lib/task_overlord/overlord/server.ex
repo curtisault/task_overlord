@@ -15,7 +15,7 @@ defmodule TaskOverlord.Server do
 
   @topic "task_overlord_server"
   @discard_interval :timer.seconds(1)
-  @demo_interval :timer.seconds(5)
+  @demo_interval :timer.seconds(10)
 
   # Client API
 
@@ -44,7 +44,11 @@ defmodule TaskOverlord.Server do
   @doc """
   Starts and tracks a task (linked to Server).
   """
-  @spec start_task({:function, function()} | {:mfa, module(), atom(), list()}, String.t(), String.t()) :: :ok
+  @spec start_task(
+          {:function, function()} | {:mfa, module(), atom(), list()},
+          String.t(),
+          String.t()
+        ) :: :ok
   def start_task(func_spec, heading, message) do
     GenServer.call(__MODULE__, {:start_task, func_spec, heading, message})
   end
@@ -52,7 +56,11 @@ defmodule TaskOverlord.Server do
   @doc """
   Starts and tracks a task (not linked to Server).
   """
-  @spec start_task_nolink({:function, function()} | {:mfa, module(), atom(), list()}, String.t(), String.t()) :: :ok
+  @spec start_task_nolink(
+          {:function, function()} | {:mfa, module(), atom(), list()},
+          String.t(),
+          String.t()
+        ) :: :ok
   def start_task_nolink(func_spec, heading, message) do
     GenServer.call(__MODULE__, {:start_task_nolink, func_spec, heading, message})
   end
@@ -287,7 +295,11 @@ defmodule TaskOverlord.Server do
     {:reply, :ok, broadcast(new_state)}
   end
 
-  def handle_call({:start_task_nolink, func_spec, heading, message}, _from, %{tasks: tasks} = state) do
+  def handle_call(
+        {:start_task_nolink, func_spec, heading, message},
+        _from,
+        %{tasks: tasks} = state
+      ) do
     # Wrap the function to catch errors and report them
     wrapped_func = fn ->
       try do
@@ -366,21 +378,39 @@ defmodule TaskOverlord.Server do
 
     case Map.get(tasks, ref) do
       nil ->
-        Logger.warning("#{__MODULE__} - Received completion for unknown task ref: #{inspect(ref)}")
+        Logger.warning(
+          "#{__MODULE__} - Received completion for unknown task ref: #{inspect(ref)}"
+        )
+
         {:noreply, state}
 
       task ->
         # Check if the result indicates an error (from our wrapper)
         case result do
           {:ok, actual_result} ->
-            updated_task = %{task | status: :done, result: actual_result, finished_at: DateTime.utc_now()}
+            updated_task = %{
+              task
+              | status: :done,
+                result: actual_result,
+                finished_at: DateTime.utc_now()
+            }
+
             new_tasks = Map.put(tasks, ref, updated_task)
             new_state = %{state | tasks: new_tasks}
             {:noreply, broadcast(new_state)}
 
           {:error, error_info} ->
-            Logger.error("#{__MODULE__} - Task failed: #{inspect(task.heading)}, error: #{inspect(error_info)}")
-            updated_task = %{task | status: :error, result: error_info, finished_at: DateTime.utc_now()}
+            Logger.error(
+              "#{__MODULE__} - Task failed: #{inspect(task.heading)}, error: #{inspect(error_info)}"
+            )
+
+            updated_task = %{
+              task
+              | status: :error,
+                result: error_info,
+                finished_at: DateTime.utc_now()
+            }
+
             new_tasks = Map.put(tasks, ref, updated_task)
             new_state = %{state | tasks: new_tasks}
             {:noreply, broadcast(new_state)}
@@ -389,14 +419,18 @@ defmodule TaskOverlord.Server do
   end
 
   # Handle task failure from Task.Supervisor
-  def handle_info({:DOWN, ref, :process, _pid, reason}, %{tasks: tasks} = state) when is_reference(ref) do
+  def handle_info({:DOWN, ref, :process, _pid, reason}, %{tasks: tasks} = state)
+      when is_reference(ref) do
     case Map.get(tasks, ref) do
       nil ->
         Logger.warning("#{__MODULE__} - Received DOWN for unknown task ref: #{inspect(ref)}")
         {:noreply, state}
 
       task ->
-        Logger.error("#{__MODULE__} - Task crashed: #{inspect(task.heading)}, reason: #{inspect(reason)}")
+        Logger.error(
+          "#{__MODULE__} - Task crashed: #{inspect(task.heading)}, reason: #{inspect(reason)}"
+        )
+
         updated_task = %{task | status: :error, result: reason, finished_at: DateTime.utc_now()}
         new_tasks = Map.put(tasks, ref, updated_task)
         new_state = %{state | tasks: new_tasks}
@@ -407,7 +441,14 @@ defmodule TaskOverlord.Server do
   # Demo task generator
   def handle_info(:create_demo_tasks, state) do
     # Create a demo task
-    task_types = ["Data Processing", "API Call", "File Upload", "Report Generation", "Email Sending"]
+    task_types = [
+      "Data Processing",
+      "API Call",
+      "File Upload",
+      "Report Generation",
+      "Email Sending"
+    ]
+
     task_type = Enum.random(task_types)
 
     # Create task function with error handling wrapper
@@ -418,11 +459,12 @@ defmodule TaskOverlord.Server do
         Process.sleep(sleep_time)
 
         # 80% success rate
-        result = if :rand.uniform() < 0.8 do
-          "Task completed successfully in #{sleep_time}ms"
-        else
-          raise "Random error occurred"
-        end
+        result =
+          if :rand.uniform() < 0.8 do
+            "Task completed successfully in #{sleep_time}ms"
+          else
+            raise "Random error occurred"
+          end
 
         {:ok, result}
       rescue
@@ -445,7 +487,7 @@ defmodule TaskOverlord.Server do
 
     stream = %OverlordStream{
       ref: stream_ref,
-      base_encoded_ref: :erlang.term_to_binary(stream_ref) |> Base.url_encode64(padding: false),
+      base_encoded_ref: OverlordStream.base_encode_ref(stream_ref),
       mfa: {__MODULE__, :demo_stream, []},
       status: :streaming,
       heading: "Data Stream",
@@ -456,7 +498,8 @@ defmodule TaskOverlord.Server do
       logs: [],
       started_at: DateTime.utc_now(),
       finished_at: nil,
-      expires_at_unix: DateTime.utc_now() |> DateTime.add(:timer.minutes(5), :millisecond) |> DateTime.to_unix()
+      expires_at_unix:
+        DateTime.utc_now() |> DateTime.add(:timer.minutes(5), :millisecond) |> DateTime.to_unix()
     }
 
     # Add stream to state
@@ -464,12 +507,13 @@ defmodule TaskOverlord.Server do
 
     updated_state = %{state | tasks: new_tasks, streams: new_streams}
 
-    # Spawn a process to simulate stream items
-    spawn(fn ->
+    # Start a supervised task to simulate stream items
+    Task.Supervisor.start_child(TaskOverlord.TaskSupervisor, fn ->
       Enum.each(1..stream_total, fn i ->
         Process.sleep(Enum.random(500..1500))
         stream_item(stream_ref, {:ok, "Item #{i}"})
       end)
+
       complete_stream(stream_ref)
     end)
 

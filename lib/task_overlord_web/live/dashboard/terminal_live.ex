@@ -27,7 +27,13 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
     overlord_streams = state.streams |> Map.values()
 
     # Add events to feed for new or updated items
-    new_events = generate_feed_events(tasks, overlord_streams, socket.assigns.tasks, socket.assigns.overlord_streams)
+    new_events =
+      generate_feed_events(
+        tasks,
+        overlord_streams,
+        socket.assigns.tasks,
+        socket.assigns.overlord_streams
+      )
 
     {:noreply,
      socket
@@ -95,9 +101,18 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
     overlord_streams = socket.assigns.overlord_streams
 
     total = length(tasks) + length(overlord_streams)
-    running = Enum.count(tasks, &(&1.status == :running)) + Enum.count(overlord_streams, &(&1.status == :streaming))
-    done = Enum.count(tasks, &(&1.status == :done)) + Enum.count(overlord_streams, &(&1.status == :done))
-    error = Enum.count(tasks, &(&1.status == :error)) + Enum.count(overlord_streams, &(&1.status == :error))
+
+    running =
+      Enum.count(tasks, &(&1.status == :running)) +
+        Enum.count(overlord_streams, &(&1.status == :streaming))
+
+    done =
+      Enum.count(tasks, &(&1.status == :done)) +
+        Enum.count(overlord_streams, &(&1.status == :done))
+
+    error =
+      Enum.count(tasks, &(&1.status == :error)) +
+        Enum.count(overlord_streams, &(&1.status == :error))
 
     cpu_usage = if total > 0, do: Float.round(running / total * 100, 1), else: 0.0
     mem_usage = if total > 0, do: Float.round((running + done) / total * 100, 1), else: 0.0
@@ -153,17 +168,20 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="min-h-screen bg-black text-green-400 font-mono p-4" style="font-family: 'Courier New', monospace;">
+    <div
+      class="min-h-screen bg-black text-green-400 font-mono p-4"
+      style="font-family: 'Courier New', monospace;"
+    >
       <!-- Terminal Header -->
       <div class="border border-green-500 p-3 mb-4 shadow-lg shadow-green-500/20">
         <div class="flex justify-between items-center">
           <div class="flex items-center gap-4">
             <span class="text-green-300">▶ FINCHART TERMINAL v1.0</span>
             <span class="text-cyan-400">
-              [SESSION: <%= @session_id %>]
+              [SESSION: {@session_id}]
             </span>
             <span class="text-cyan-400">
-              UTC: <%= Calendar.strftime(@current_time, "%Y-%m-%d %H:%M:%S") %>
+              UTC: {Calendar.strftime(@current_time, "%Y-%m-%d %H:%M:%S")}
             </span>
           </div>
           <div class="flex gap-2">
@@ -189,18 +207,22 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
                 <%= for task <- Enum.take(@tasks, 10) do %>
                   <div class="border-l-2 border-green-700 pl-2">
                     <div class="flex justify-between items-start">
-                      <span class="text-green-300">▸ <%= String.slice(to_string(task.heading), 0, 30) %></span>
+                      <span class="text-green-300">
+                        ▸ {String.slice(to_string(task.heading), 0, 30)}
+                      </span>
                       <span class={"#{status_color(task.status)} font-bold"}>
-                        <%= status_indicator(task.status) %>
+                        {status_indicator(task.status)}
                       </span>
                     </div>
                     <div class="text-xs text-gray-500 mt-1">
-                      PID: <%= inspect(task.pid) |> String.slice(0, 20) %> |
-                      UPTIME: <%= format_duration_ms(DateTime.diff(DateTime.utc_now(), task.started_at, :millisecond)) %>
+                      PID: {inspect(task.pid) |> String.slice(0, 20)} |
+                      UPTIME: {format_duration_ms(
+                        DateTime.diff(DateTime.utc_now(), task.started_at, :millisecond)
+                      )}
                     </div>
                     <%= if task.status == :running do %>
                       <div class="text-cyan-400 text-xs mt-1 animate-pulse">
-                        <%= render_progress_bar(rem(System.system_time(:second), 10), 10, 30) %>
+                        {render_progress_bar(rem(System.system_time(:second), 10), 10, 30)}
                       </div>
                     <% end %>
                   </div>
@@ -212,8 +234,8 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
               </div>
             <% end %>
           </div>
-
-          <!-- Stream Monitor -->
+          
+    <!-- Stream Monitor -->
           <%= if length(@overlord_streams) > 0 do %>
             <div class="border border-cyan-500 p-3 shadow-lg shadow-cyan-500/20">
               <div class="text-cyan-400 mb-2">─── STREAM MONITOR ───</div>
@@ -221,18 +243,20 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
                 <%= for stream <- Enum.take(@overlord_streams, 5) do %>
                   <div class="border-l-2 border-cyan-700 pl-2">
                     <div class="flex justify-between items-start">
-                      <span class="text-cyan-300">▸ <%= String.slice(to_string(stream.heading), 0, 30) %></span>
+                      <span class="text-cyan-300">
+                        ▸ {String.slice(to_string(stream.heading), 0, 30)}
+                      </span>
                       <span class={"#{status_color(stream.status)} font-bold"}>
-                        <%= status_indicator(stream.status) %>
+                        {status_indicator(stream.status)}
                       </span>
                     </div>
                     <div class="text-xs text-gray-500 mt-1">
-                      PROGRESS: <%= stream.stream_completed %>/<%= stream.stream_total %>
+                      PROGRESS: {stream.stream_completed}/{stream.stream_total}
                     </div>
                     <div class="text-cyan-400 text-xs mt-1">
-                      <%= render_progress_bar(stream.stream_completed, stream.stream_total, 30) %>
+                      {render_progress_bar(stream.stream_completed, stream.stream_total, 30)}
                       <%= if stream.stream_total > 0 do %>
-                        <%= Float.round(stream.stream_completed / stream.stream_total * 100, 1) %>%
+                        {Float.round(stream.stream_completed / stream.stream_total * 100, 1)}%
                       <% end %>
                     </div>
                   </div>
@@ -240,34 +264,46 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
               </div>
             </div>
           <% end %>
-
-          <!-- Quick Actions -->
+          
+    <!-- Quick Actions -->
           <div class="border border-yellow-500 p-3 shadow-lg shadow-yellow-500/20">
             <div class="text-yellow-400 mb-2">─── QUICK ACTIONS ───</div>
             <div class="space-y-1">
-              <button phx-click="action_new_task" class="w-full text-left hover:bg-green-900/30 px-2 py-1">
+              <button
+                phx-click="action_new_task"
+                class="w-full text-left hover:bg-green-900/30 px-2 py-1"
+              >
                 [F1] NEW_TASK
               </button>
-              <button phx-click="action_stop_all" class="w-full text-left hover:bg-green-900/30 px-2 py-1">
+              <button
+                phx-click="action_stop_all"
+                class="w-full text-left hover:bg-green-900/30 px-2 py-1"
+              >
                 [F2] STOP_ALL
               </button>
-              <button phx-click="action_clear_done" class="w-full text-left hover:bg-green-900/30 px-2 py-1">
+              <button
+                phx-click="action_clear_done"
+                class="w-full text-left hover:bg-green-900/30 px-2 py-1"
+              >
                 [F3] CLEAR_DONE
               </button>
-              <button phx-click="action_export" class="w-full text-left hover:bg-green-900/30 px-2 py-1">
+              <button
+                phx-click="action_export"
+                class="w-full text-left hover:bg-green-900/30 px-2 py-1"
+              >
                 [F4] EXPORT
               </button>
             </div>
           </div>
-
-          <!-- System Metrics -->
+          
+    <!-- System Metrics -->
           <div class="border border-green-500 p-3 shadow-lg shadow-green-500/20">
             <div class="text-cyan-400 mb-2">─── SYSTEM METRICS ───</div>
             <div class="space-y-2 text-sm">
               <div>
                 <div class="flex justify-between mb-1">
                   <span class="text-gray-400">CPU:</span>
-                  <span class="text-green-400"><%= @stats.cpu_usage %>%</span>
+                  <span class="text-green-400">{@stats.cpu_usage}%</span>
                 </div>
                 <div class="bg-gray-800 h-2 rounded">
                   <div
@@ -281,7 +317,7 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
               <div>
                 <div class="flex justify-between mb-1">
                   <span class="text-gray-400">MEM:</span>
-                  <span class="text-cyan-400"><%= @stats.mem_usage %>%</span>
+                  <span class="text-cyan-400">{@stats.mem_usage}%</span>
                 </div>
                 <div class="bg-gray-800 h-2 rounded">
                   <div
@@ -295,26 +331,26 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
               <div class="pt-2 border-t border-gray-700">
                 <div class="flex justify-between">
                   <span class="text-gray-400">TOTAL:</span>
-                  <span class="text-green-400"><%= @stats.total %></span>
+                  <span class="text-green-400">{@stats.total}</span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-gray-400">RUNNING:</span>
-                  <span class="text-yellow-400"><%= @stats.running %></span>
+                  <span class="text-yellow-400">{@stats.running}</span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-gray-400">DONE:</span>
-                  <span class="text-green-400"><%= @stats.done %></span>
+                  <span class="text-green-400">{@stats.done}</span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-gray-400">ERROR:</span>
-                  <span class="text-red-400"><%= @stats.error %></span>
+                  <span class="text-red-400">{@stats.error}</span>
                 </div>
               </div>
             </div>
           </div>
         </div>
-
-        <!-- Right Column: Live Feed + Analytics -->
+        
+    <!-- Right Column: Live Feed + Analytics -->
         <div class="col-span-7 space-y-4">
           <!-- Live Feed -->
           <div class="border border-green-500 p-3 shadow-lg shadow-green-500/20 h-[600px] flex flex-col">
@@ -322,95 +358,93 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
             <div class="flex-1 overflow-y-auto space-y-1 text-sm">
               <%= if length(@feed_events) == 0 do %>
                 <div class="text-gray-600">
-                  [<%= format_timestamp(@current_time) %>] INFO: Waiting for events...
+                  [{format_timestamp(@current_time)}] INFO: Waiting for events...
                 </div>
               <% end %>
 
               <%= for {event_type, item, timestamp} <- @feed_events do %>
                 <div class="flex gap-2">
-                  <span class="text-gray-500">[<%= format_timestamp(timestamp) %>]</span>
+                  <span class="text-gray-500">[{format_timestamp(timestamp)}]</span>
                   <%= case event_type do %>
                     <% :task_started -> %>
                       <span class="text-cyan-400">TASK_START:</span>
-                      <span class="text-green-300"><%= item.heading %> started</span>
+                      <span class="text-green-300">{item.heading} started</span>
                     <% :task_completed -> %>
                       <span class="text-green-400">TASK_DONE:</span>
                       <span class="text-green-300">
-                        <%= item.heading %> completed in <%= format_duration_ms(
+                        {item.heading} completed in {format_duration_ms(
                           DateTime.diff(item.finished_at, item.started_at, :millisecond)
-                        ) %>
+                        )}
                       </span>
                     <% :task_failed -> %>
                       <span class="text-red-400">TASK_ERROR:</span>
-                      <span class="text-red-300"><%= item.heading %> failed</span>
+                      <span class="text-red-300">{item.heading} failed</span>
                     <% :stream_started -> %>
                       <span class="text-cyan-400">STREAM_START:</span>
                       <span class="text-cyan-300">
-                        <%= item.heading %> started (<%= item.stream_total %> items)
+                        {item.heading} started ({item.stream_total} items)
                       </span>
                     <% :stream_completed -> %>
                       <span class="text-green-400">STREAM_DONE:</span>
                       <span class="text-green-300">
-                        <%= item.heading %> completed <%= item.stream_completed %> items
+                        {item.heading} completed {item.stream_completed} items
                       </span>
                     <% :stream_progress -> %>
                       <span class="text-yellow-400">STREAM_PROGRESS:</span>
                       <span class="text-yellow-300">
-                        <%= item.heading %> - <%= item.stream_completed %>/<%= item.stream_total %>
+                        {item.heading} - {item.stream_completed}/{item.stream_total}
                       </span>
                   <% end %>
                 </div>
               <% end %>
 
               <div class="flex gap-2 animate-pulse">
-                <span class="text-gray-500">[<%= format_timestamp(@current_time) %>]</span>
+                <span class="text-gray-500">[{format_timestamp(@current_time)}]</span>
                 <span class="text-gray-600">_</span>
               </div>
             </div>
           </div>
-
-          <!-- Analytics -->
+          
+    <!-- Analytics -->
           <div class="border border-green-500 p-3 shadow-lg shadow-green-500/20">
             <div class="text-cyan-400 mb-2">─── ANALYTICS ───</div>
             <div class="grid grid-cols-2 gap-4">
               <div class="border border-gray-700 p-3">
-                <div class="text-green-300 font-bold text-2xl"><%= @stats.total %></div>
+                <div class="text-green-300 font-bold text-2xl">{@stats.total}</div>
                 <div class="text-xs text-gray-500">Total Tasks</div>
               </div>
               <div class="border border-gray-700 p-3">
-                <div class="text-yellow-300 font-bold text-2xl"><%= @stats.running %></div>
+                <div class="text-yellow-300 font-bold text-2xl">{@stats.running}</div>
                 <div class="text-xs text-gray-500">Active</div>
               </div>
               <div class="border border-gray-700 p-3">
-                <div class="text-green-300 font-bold text-2xl"><%= @stats.done %></div>
+                <div class="text-green-300 font-bold text-2xl">{@stats.done}</div>
                 <div class="text-xs text-gray-500">Completed</div>
               </div>
               <div class="border border-gray-700 p-3">
-                <div class="text-red-300 font-bold text-2xl"><%= @stats.error %></div>
+                <div class="text-red-300 font-bold text-2xl">{@stats.error}</div>
                 <div class="text-xs text-gray-500">Errors</div>
               </div>
             </div>
-
-            <!-- Success Rate Chart -->
+            
+    <!-- Success Rate Chart -->
             <div class="mt-4 border border-gray-700 p-3">
               <div class="text-xs text-gray-400 mb-2">Success Rate</div>
               <div class="flex items-end gap-1 h-20">
                 <%= for i <- 1..20 do %>
-                  <%
-                  height =
+                  <% height =
                     cond do
                       @stats.total == 0 -> 0
                       rem(i, 3) == 0 -> Enum.random(40..100)
                       true -> Enum.random(60..95)
-                    end
-                  %>
+                    end %>
                   <div class="flex-1 bg-green-600 transition-all" style={"height: #{height}%"}></div>
                 <% end %>
               </div>
             </div>
           </div>
-
-          <!-- Command Line -->
+          
+    <!-- Command Line -->
           <div class="border border-green-500 p-3 shadow-lg shadow-green-500/20">
             <div class="text-cyan-400 mb-2">─── COMMAND ───</div>
             <div class="flex items-center gap-2">
@@ -430,8 +464,8 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
           </div>
         </div>
       </div>
-
-      <!-- Status Bar -->
+      
+    <!-- Status Bar -->
       <div class="border border-green-500 p-2 mt-4 flex justify-between text-xs shadow-lg shadow-green-500/20">
         <div class="flex gap-4">
           <span class="text-green-400">STATUS: ONLINE</span>
@@ -439,7 +473,9 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
         </div>
         <div class="flex gap-4">
           <span class="text-yellow-400">LATENCY: 12ms</span>
-          <span class="text-green-400">UPTIME: <%= format_duration_ms(System.system_time(:millisecond)) %></span>
+          <span class="text-green-400">
+            UPTIME: {format_duration_ms(System.system_time(:millisecond))}
+          </span>
         </div>
       </div>
     </div>

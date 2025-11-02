@@ -70,10 +70,12 @@ defmodule TaskOverlordWeb.Dashboard.CardsLive do
   end
 
   defp format_duration_ms(ms) when ms < 1000, do: "#{ms}ms"
+
   defp format_duration_ms(ms) when ms < 60_000 do
     seconds = Float.round(ms / 1000, 1)
     "#{seconds}s"
   end
+
   defp format_duration_ms(ms) do
     minutes = div(ms, 60_000)
     seconds = div(rem(ms, 60_000), 1000)
@@ -84,13 +86,17 @@ defmodule TaskOverlordWeb.Dashboard.CardsLive do
     diff = DateTime.diff(DateTime.utc_now(), datetime, :second)
 
     cond do
-      diff < 60 -> "#{diff}s ago"
+      diff < 60 ->
+        "#{diff}s ago"
+
       diff < 3600 ->
         minutes = div(diff, 60)
         "#{minutes}m ago"
+
       diff < 86400 ->
         hours = div(diff, 3600)
         "#{hours}h ago"
+
       true ->
         days = div(diff, 86400)
         "#{days}d ago"
@@ -120,37 +126,37 @@ defmodule TaskOverlordWeb.Dashboard.CardsLive do
             <.link navigate="/dashboard/terminal" class="btn btn-ghost">Terminal</.link>
           </div>
         </div>
-
-        <!-- Stats Overview -->
+        
+    <!-- Stats Overview -->
         <div class="stats shadow w-full">
           <div class="stat">
             <div class="stat-title">Total Tasks</div>
-            <div class="stat-value"><%= @stats.total %></div>
+            <div class="stat-value">{@stats.total}</div>
           </div>
 
           <div class="stat">
             <div class="stat-title">Running</div>
-            <div class="stat-value text-warning"><%= @stats.running %></div>
+            <div class="stat-value text-warning">{@stats.running}</div>
           </div>
 
           <div class="stat">
             <div class="stat-title">Completed</div>
-            <div class="stat-value text-success"><%= @stats.done %></div>
+            <div class="stat-value text-success">{@stats.done}</div>
           </div>
 
           <div class="stat">
             <div class="stat-title">Errors</div>
-            <div class="stat-value text-error"><%= @stats.error %></div>
+            <div class="stat-value text-error">{@stats.error}</div>
           </div>
 
           <div class="stat">
             <div class="stat-title">Success Rate</div>
-            <div class="stat-value"><%= @stats.success_rate %>%</div>
+            <div class="stat-value">{@stats.success_rate}%</div>
             <div class="stat-desc">Task completion</div>
           </div>
         </div>
-
-        <!-- Tasks Section -->
+        
+    <!-- Tasks Section -->
         <%= if length(@tasks) > 0 do %>
           <div>
             <h2 class="text-2xl font-bold mb-4">Tasks</h2>
@@ -159,33 +165,33 @@ defmodule TaskOverlordWeb.Dashboard.CardsLive do
                 <div class="card bg-base-100 shadow-xl">
                   <div class="card-body">
                     <div class="flex justify-between items-start">
-                      <h3 class="card-title text-lg"><%= task.heading %></h3>
+                      <h3 class="card-title text-lg">{task.heading}</h3>
                       <span class={"badge #{status_class(task.status)}"}>
-                        <%= status_display(task.status) %>
+                        {status_display(task.status)}
                       </span>
                     </div>
 
-                    <p class="text-sm text-base-content/70"><%= task.message %></p>
+                    <p class="text-sm text-base-content/70">{task.message}</p>
 
                     <div class="divider my-2"></div>
 
                     <div class="space-y-2 text-sm">
                       <div class="flex justify-between">
                         <span class="text-base-content/60">Started:</span>
-                        <span class="font-mono"><%= format_relative_time(task.started_at) %></span>
+                        <span class="font-mono">{format_relative_time(task.started_at)}</span>
                       </div>
 
                       <%= if task.finished_at do %>
                         <div class="flex justify-between">
                           <span class="text-base-content/60">Finished:</span>
-                          <span class="font-mono"><%= format_relative_time(task.finished_at) %></span>
+                          <span class="font-mono">{format_relative_time(task.finished_at)}</span>
                         </div>
                       <% end %>
 
                       <div class="flex justify-between">
                         <span class="text-base-content/60">Duration:</span>
                         <span class="font-mono font-bold">
-                          <%= format_duration(task.started_at, task.finished_at) %>
+                          {format_duration(task.started_at, task.finished_at)}
                         </span>
                       </div>
 
@@ -193,7 +199,7 @@ defmodule TaskOverlordWeb.Dashboard.CardsLive do
                         <div class="alert alert-error mt-2">
                           <div class="text-xs">
                             <div class="font-bold">Error:</div>
-                            <div class="font-mono"><%= inspect(task.result) %></div>
+                            <div class="font-mono">{inspect(task.result)}</div>
                           </div>
                         </div>
                       <% end %>
@@ -216,14 +222,14 @@ defmodule TaskOverlordWeb.Dashboard.CardsLive do
                       <div class="collapse collapse-arrow bg-base-200">
                         <input type="checkbox" />
                         <div class="collapse-title text-sm font-medium">
-                          Logs (<%= length(task.logs) %>)
+                          Logs ({length(task.logs)})
                         </div>
                         <div class="collapse-content">
                           <div class="space-y-1">
                             <%= for {level, log} <- task.logs do %>
                               <div class="text-xs">
-                                <span class="badge badge-xs"><%= level %></span>
-                                <span class="ml-2"><%= log %></span>
+                                <span class="badge badge-xs">{level}</span>
+                                <span class="ml-2">{log}</span>
                               </div>
                             <% end %>
                           </div>
@@ -246,8 +252,8 @@ defmodule TaskOverlordWeb.Dashboard.CardsLive do
             </div>
           </div>
         <% end %>
-
-        <!-- Streams Section -->
+        
+    <!-- Streams Section -->
         <%= if length(@overlord_streams) > 0 do %>
           <div>
             <h2 class="text-2xl font-bold mb-4">Streams</h2>
@@ -256,22 +262,22 @@ defmodule TaskOverlordWeb.Dashboard.CardsLive do
                 <div class="card bg-base-100 shadow-xl">
                   <div class="card-body">
                     <div class="flex justify-between items-start">
-                      <h3 class="card-title text-lg"><%= stream.heading %></h3>
+                      <h3 class="card-title text-lg">{stream.heading}</h3>
                       <span class={"badge #{status_class(stream.status)}"}>
-                        <%= status_display(stream.status) %>
+                        {status_display(stream.status)}
                       </span>
                     </div>
 
-                    <p class="text-sm text-base-content/70"><%= stream.message %></p>
+                    <p class="text-sm text-base-content/70">{stream.message}</p>
 
                     <div class="divider my-2"></div>
-
-                    <!-- Progress Bar -->
+                    
+    <!-- Progress Bar -->
                     <div class="space-y-2">
                       <div class="flex justify-between text-sm">
                         <span>Progress</span>
                         <span class="font-mono">
-                          <%= stream.stream_completed %>/<%= stream.stream_total %>
+                          {stream.stream_completed}/{stream.stream_total}
                         </span>
                       </div>
                       <progress
@@ -282,7 +288,7 @@ defmodule TaskOverlordWeb.Dashboard.CardsLive do
                       </progress>
                       <%= if stream.stream_total > 0 do %>
                         <div class="text-xs text-center">
-                          <%= Float.round(stream.stream_completed / stream.stream_total * 100, 1) %>%
+                          {Float.round(stream.stream_completed / stream.stream_total * 100, 1)}%
                         </div>
                       <% end %>
                     </div>
@@ -292,20 +298,20 @@ defmodule TaskOverlordWeb.Dashboard.CardsLive do
                     <div class="space-y-2 text-sm">
                       <div class="flex justify-between">
                         <span class="text-base-content/60">Started:</span>
-                        <span class="font-mono"><%= format_relative_time(stream.started_at) %></span>
+                        <span class="font-mono">{format_relative_time(stream.started_at)}</span>
                       </div>
 
                       <%= if stream.finished_at do %>
                         <div class="flex justify-between">
                           <span class="text-base-content/60">Finished:</span>
-                          <span class="font-mono"><%= format_relative_time(stream.finished_at) %></span>
+                          <span class="font-mono">{format_relative_time(stream.finished_at)}</span>
                         </div>
                       <% end %>
 
                       <div class="flex justify-between">
                         <span class="text-base-content/60">Duration:</span>
                         <span class="font-mono font-bold">
-                          <%= format_duration(stream.started_at, stream.finished_at) %>
+                          {format_duration(stream.started_at, stream.finished_at)}
                         </span>
                       </div>
                     </div>
@@ -315,14 +321,14 @@ defmodule TaskOverlordWeb.Dashboard.CardsLive do
                       <div class="collapse collapse-arrow bg-base-200">
                         <input type="checkbox" />
                         <div class="collapse-title text-sm font-medium">
-                          Logs (<%= length(stream.logs) %>)
+                          Logs ({length(stream.logs)})
                         </div>
                         <div class="collapse-content">
                           <div class="space-y-1">
                             <%= for {level, log} <- stream.logs do %>
                               <div class="text-xs">
-                                <span class="badge badge-xs"><%= level %></span>
-                                <span class="ml-2"><%= log %></span>
+                                <span class="badge badge-xs">{level}</span>
+                                <span class="ml-2">{log}</span>
                               </div>
                             <% end %>
                           </div>

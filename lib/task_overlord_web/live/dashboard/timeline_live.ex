@@ -119,7 +119,7 @@ defmodule TaskOverlordWeb.Dashboard.TimelineLive do
   def render(assigns) do
     ~H"""
     <div class="min-h-screen bg-base-200 p-6">
-      <div class="max-w-5xl mx-auto space-y-6">
+      <div class="mx-auto space-y-6">
         <!-- Header -->
         <div class="flex justify-between items-center">
           <h1 class="text-4xl font-bold">Task Monitor - Timeline</h1>
@@ -128,8 +128,8 @@ defmodule TaskOverlordWeb.Dashboard.TimelineLive do
             <.link navigate="/dashboard/terminal" class="btn btn-ghost">Terminal</.link>
           </div>
         </div>
-
-        <!-- Filter Tabs -->
+        
+    <!-- Filter Tabs -->
         <div class="tabs tabs-boxed bg-base-100 shadow">
           <button
             phx-click="filter"
@@ -160,13 +160,12 @@ defmodule TaskOverlordWeb.Dashboard.TimelineLive do
             Errors
           </button>
         </div>
-
-        <!-- Active Tasks Section -->
+        
+    <!-- Active Tasks Section -->
         <%= if length(@active_items) > 0 do %>
           <div class="bg-base-100 rounded-lg shadow-xl p-6">
             <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
-              <span class="loading loading-spinner loading-sm text-warning"></span>
-              Active Now
+              <span class="loading loading-spinner loading-sm text-warning"></span> Active Now
             </h2>
             <ul class="timeline timeline-vertical timeline-snap-icon">
               <%= for {type, item} <- @active_items do %>
@@ -175,22 +174,22 @@ defmodule TaskOverlordWeb.Dashboard.TimelineLive do
                     <.icon name={status_icon(item.status)} class="w-5 h-5" />
                   </div>
                   <div class="timeline-start mb-10">
-                    <time class="font-mono text-sm"><%= format_timestamp(item.started_at) %></time>
+                    <time class="font-mono text-sm">{format_timestamp(item.started_at)}</time>
                   </div>
                   <div class="timeline-end mb-10">
                     <div class="card bg-base-200 shadow">
                       <div class="card-body p-4">
                         <div class="flex justify-between items-start gap-2">
                           <div class="flex-1">
-                            <div class="font-bold text-lg"><%= item.heading %></div>
-                            <div class="text-sm text-base-content/70"><%= item.message %></div>
+                            <div class="font-bold text-lg">{item.heading}</div>
+                            <div class="text-sm text-base-content/70">{item.message}</div>
                           </div>
                           <div class="flex flex-col items-end gap-1">
                             <span class="badge badge-sm badge-warning">
-                              <%= status_display(item.status) %>
+                              {status_display(item.status)}
                             </span>
                             <span class="text-xs font-mono">
-                              <%= format_duration(item.started_at, item.finished_at) %>
+                              {format_duration(item.started_at, item.finished_at)}
                             </span>
                           </div>
                         </div>
@@ -200,7 +199,7 @@ defmodule TaskOverlordWeb.Dashboard.TimelineLive do
                             <div class="flex justify-between text-xs mb-1">
                               <span>Progress</span>
                               <span class="font-mono">
-                                <%= item.stream_completed %>/<%= item.stream_total %>
+                                {item.stream_completed}/{item.stream_total}
                               </span>
                             </div>
                             <progress
@@ -216,14 +215,14 @@ defmodule TaskOverlordWeb.Dashboard.TimelineLive do
                           <div class="collapse collapse-arrow bg-base-100 mt-2">
                             <input type="checkbox" />
                             <div class="collapse-title text-xs font-medium px-2 py-1 min-h-0">
-                              Logs (<%= length(item.logs) %>)
+                              Logs ({length(item.logs)})
                             </div>
                             <div class="collapse-content px-2">
                               <div class="space-y-1">
                                 <%= for {level, log} <- item.logs do %>
                                   <div class="text-xs">
-                                    <span class="badge badge-xs"><%= level %></span>
-                                    <span class="ml-2"><%= log %></span>
+                                    <span class="badge badge-xs">{level}</span>
+                                    <span class="ml-2">{log}</span>
                                   </div>
                                 <% end %>
                               </div>
@@ -249,8 +248,8 @@ defmodule TaskOverlordWeb.Dashboard.TimelineLive do
             </ul>
           </div>
         <% end %>
-
-        <!-- Past Hour Section -->
+        
+    <!-- Past Hour Section -->
         <%= if length(@past_hour_items) > 0 do %>
           <div class="bg-base-100 rounded-lg shadow-xl p-6">
             <h2 class="text-2xl font-bold mb-6">Last Hour</h2>
@@ -261,22 +260,22 @@ defmodule TaskOverlordWeb.Dashboard.TimelineLive do
                     <.icon name={status_icon(item.status)} class="w-5 h-5" />
                   </div>
                   <div class="timeline-start mb-10">
-                    <time class="font-mono text-sm"><%= format_timestamp(item.started_at) %></time>
+                    <time class="font-mono text-sm">{format_timestamp(item.started_at)}</time>
                   </div>
                   <div class="timeline-end mb-10">
                     <div class="card bg-base-200 shadow">
                       <div class="card-body p-4">
                         <div class="flex justify-between items-start gap-2">
                           <div class="flex-1">
-                            <div class="font-bold"><%= item.heading %></div>
-                            <div class="text-sm text-base-content/70"><%= item.message %></div>
+                            <div class="font-bold">{item.heading}</div>
+                            <div class="text-sm text-base-content/70">{item.message}</div>
                           </div>
                           <div class="flex flex-col items-end gap-1">
                             <span class={"badge badge-sm #{if item.status == :done, do: "badge-success", else: "badge-error"}"}>
-                              <%= status_display(item.status) %>
+                              {status_display(item.status)}
                             </span>
                             <span class="text-xs font-mono">
-                              <%= format_duration(item.started_at, item.finished_at) %>
+                              {format_duration(item.started_at, item.finished_at)}
                             </span>
                           </div>
                         </div>
@@ -284,14 +283,14 @@ defmodule TaskOverlordWeb.Dashboard.TimelineLive do
                         <%= if type == :stream do %>
                           <div class="mt-2 text-xs">
                             <span class="font-mono">
-                              <%= item.stream_completed %>/<%= item.stream_total %> items
+                              {item.stream_completed}/{item.stream_total} items
                             </span>
                           </div>
                         <% end %>
 
                         <%= if type == :task && item.status == :error && item.result do %>
                           <div class="alert alert-error mt-2 py-2">
-                            <div class="text-xs font-mono"><%= inspect(item.result) %></div>
+                            <div class="text-xs font-mono">{inspect(item.result)}</div>
                           </div>
                         <% end %>
 
@@ -311,7 +310,7 @@ defmodule TaskOverlordWeb.Dashboard.TimelineLive do
                           <div class="collapse collapse-arrow bg-base-100 mt-2">
                             <input type="checkbox" />
                             <div class="collapse-title text-xs font-medium px-2 py-1 min-h-0">
-                              Results (<%= length(item.stream_results) %>)
+                              Results ({length(item.stream_results)})
                             </div>
                             <div class="collapse-content px-2">
                               <pre class="text-xs overflow-auto"><%= inspect(item.stream_results, pretty: true) %></pre>
@@ -337,8 +336,8 @@ defmodule TaskOverlordWeb.Dashboard.TimelineLive do
             </ul>
           </div>
         <% end %>
-
-        <!-- Completed Section -->
+        
+    <!-- Completed Section -->
         <%= if length(@completed_items) > 0 do %>
           <div class="bg-base-100 rounded-lg shadow-xl p-6">
             <h2 class="text-2xl font-bold mb-6">Completed Earlier</h2>
@@ -349,17 +348,19 @@ defmodule TaskOverlordWeb.Dashboard.TimelineLive do
                     <.icon name={status_icon(item.status)} class="w-4 h-4" />
                   </div>
                   <div class="timeline-start mb-6">
-                    <time class="font-mono text-xs"><%= format_timestamp(item.started_at) %></time>
+                    <time class="font-mono text-xs">{format_timestamp(item.started_at)}</time>
                   </div>
                   <div class="timeline-end mb-6">
                     <div class="text-sm">
-                      <span class="font-bold"><%= item.heading %></span>
+                      <span class="font-bold">{item.heading}</span>
                       <span class="mx-2">·</span>
                       <span class={"badge badge-xs #{if item.status == :done, do: "badge-success", else: "badge-error"}"}>
-                        <%= status_display(item.status) %>
+                        {status_display(item.status)}
                       </span>
                       <span class="mx-2">·</span>
-                      <span class="font-mono text-xs"><%= format_duration(item.started_at, item.finished_at) %></span>
+                      <span class="font-mono text-xs">
+                        {format_duration(item.started_at, item.finished_at)}
+                      </span>
                       <button
                         phx-click={if type == :task, do: "discard_task", else: "discard_stream"}
                         phx-value-ref={item.base_encoded_ref}

@@ -71,7 +71,7 @@ defmodule TaskOverlord.OverlordStream do
     DateTime.to_unix(DateTime.utc_now()) > stream.expires_at_unix
   end
 
-  defp base_encode_ref(ref) do
+  def base_encode_ref(ref) do
     ref |> :erlang.term_to_binary() |> Base.url_encode64(padding: false)
   end
 

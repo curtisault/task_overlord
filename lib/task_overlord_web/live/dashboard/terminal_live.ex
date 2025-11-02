@@ -4,6 +4,8 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
   alias TaskOverlordWeb.Dashboard.Commands
   alias TaskOverlordWeb.Dashboard.CommandSearch
 
+  @feed_limit 50
+
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket) do
@@ -48,7 +50,7 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
      socket
      |> assign(:tasks, tasks)
      |> assign(:overlord_streams, overlord_streams)
-     |> assign(:feed_events, Enum.take(new_events ++ socket.assigns.feed_events, 20))
+     |> assign(:feed_events, Enum.take(new_events ++ socket.assigns.feed_events, @feed_limit))
      |> assign_stats()}
   end
 
@@ -413,7 +415,7 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
         </div>
         
     <!-- Right Column: Command + Live Feed + Analytics -->
-        <div class="col-span-7 flex flex-col gap-4">
+        <div class="col-span-7 flex flex-col gap-4 h-full min-h-0">
           <!-- Command Line -->
           <div class="border border-green-500 p-3 shadow-lg shadow-green-500/20">
             <div class="flex items-center justify-between mb-2">
@@ -993,6 +995,6 @@ defmodule TaskOverlordWeb.Dashboard.TerminalLive do
   end
 
   defp add_feed_event(socket, event) do
-    assign(socket, :feed_events, [event | socket.assigns.feed_events] |> Enum.take(20))
+    assign(socket, :feed_events, [event | socket.assigns.feed_events] |> Enum.take(@feed_limit))
   end
 end

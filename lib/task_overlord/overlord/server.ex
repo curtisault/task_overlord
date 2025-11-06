@@ -1,9 +1,14 @@
 defmodule TaskOverlord.Server do
   @moduledoc """
-  Shared GenServer that tracks both tasks and streams for unified monitoring.
+  **Centralized GenServer for real-time task and stream monitoring**
 
-  This server maintains state for all tracked tasks and streams, broadcasts
-  updates via PubSub, and handles cleanup of expired items.
+  - Tracks asynchronous tasks and data streams in unified state
+  - Broadcasts live updates via Phoenix PubSub to subscribed processes
+  - Automatically spawns tasks via Task.Supervisor with error handling
+  - Handles task completion, failure, and crash scenarios gracefully
+  - Periodically expires and cleans up finished work
+  - Provides subscription API for building reactive UIs
+
   """
 
   use GenServer
